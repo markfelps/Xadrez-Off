@@ -4,9 +4,11 @@ import {
   ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent,
   HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime,
 } from './logic.js';
-import { drawBoard, kingSquare } from './board.js';
-import { S, save } from './store.js';
+import { drawBoard, kingSquare, boardPrefs } from './board.js';
+import { S, save, orientFlipped, exportBackup, importBackup } from './store.js';
 import { openReview } from './review.js';
+import { openConsult } from './consult.js';
+import { downloadText } from './util.js';
 import { openPuzzles, puzzleCount } from './puzzles.js';
 import { openEditor } from './editor.js';
 
@@ -315,7 +317,7 @@ function newGame(color, fen = null, oppElo = null) {
   if (oppElo) setElo(oppElo);
   chess = c; startFen = fen;
   myColor = color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
-  flipped = myColor === 'b';
+  flipped = orientFlipped(myColor);
   gameElo = elo;
   active = true; thinking = false; selected = null; legal = [];
   hintCost = 0; undoCost = 0; hintMarks = {}; hintMv = null;
@@ -410,6 +412,7 @@ function review(g) {
   openReview(g, {
     onPlay: (fen, color, oppElo) => newGame(color, fen, oppElo),
     onPuzzles: renderLevel,
+    onConsult: (game) => openConsult({ startFen: game.startFen, moves: game.moves }),
   });
 }
 
@@ -426,12 +429,31 @@ $('hintMode').value = S.hintMode;
 $('hintMode').onchange = () => { S.hintMode = $('hintMode').value; save(); render(); };
 $('reviewBtn').onclick = () => lastGame && review(lastGame);
 $('puzBtn').onclick = () => openPuzzles();
+$('consBtn').onclick = () => openConsult();
+$('orient').value = S.orient;
+$('orient').onchange = () => { S.orient = $('orient').value; save(); flipped = orientFlipped(myColor); render(); };
+boardPrefs.sqNames = S.sqNames;
+$('sqNames').checked = S.sqNames;
+$('sqNames').onchange = () => { S.sqNames = $('sqNames').checked; boardPrefs.sqNames = S.sqNames; save(); render(); };
+$('bkExport').onclick = () => downloadText(`xadrez-backup-${new Date().toISOString().slice(0, 10)}.json`, exportBackup());
+$('bkImport').onclick = () => $('bkFile').click();
+$('bkFile').onchange = async () => {
+  const f = $('bkFile').files[0];
+  if (!f) return;
+  try {
+    if (!confirm('Importar o backup vai substituir o rating, as partidas e os puzzles deste aparelho. Continuar?')) return;
+    importBackup(await f.text());
+    location.reload();
+  } catch (e) { alert('Não foi possível importar: ' + e.message); }
+  $('bkFile').value = '';
+};
 $('posBtn').onclick = () => openEditor({ onPlay: (fen, color) => newGame(color, fen) });
 
 // ---------- init ----------
 $('fullEngine').checked = (() => { try { return localStorage.getItem('xo-full') === '1'; } catch { return false; } })() || !matchMedia('(pointer: coarse)').matches;
 fetch('engine/stockfish-19-single.wasm', { method: 'HEAD' }).then((r) => { if (!r.ok) throw 0; }).catch(() => { $('fullEngine').checked = false; $('fullEngine').closest('label').hidden = true; });
 $('fullEngine').onchange = () => { saveFull(); warm(); };
+flipped = orientFlipped('w');
 buildClockUi();
 buildPresets();
 setElo(elo);

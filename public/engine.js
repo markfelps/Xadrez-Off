@@ -82,10 +82,44 @@ class UciEngine {
       const base = startFen ? `position fen ${startFen}` : 'position startpos';
       this.send(base + (moves.length ? ' moves ' + moves.join(' ') : ''));
       const done = this._waitFor(/^bestmove (\S+)/, plan.movetime + 30000);
+      this.searching = 'game';
       this.send(`go movetime ${plan.movetime}`);
-      return (await done)[1];
+      try { return (await done)[1]; } finally { this.searching = null; }
     });
   }
+
+  // análise com várias linhas (MultiPV). onInfo recebe as linhas parciais; opts.cancelled() evita rodar se já ficou obsoleta
+  analyzeMulti(fen, movetime = 1500, multipv = 3, onInfo = null, opts = {}) {
+    return this.run(async () => {
+      if (opts.cancelled && opts.cancelled()) return [];
+      await this.ready;
+      this.send('setoption name UCI_LimitStrength value false');
+      this.send(`setoption name MultiPV value ${multipv}`);
+      await this.isReady();
+      if (opts.cancelled && opts.cancelled()) { this.send('setoption name MultiPV value 1'); return []; }
+      this.send('position fen ' + fen);
+      const best = new Map();
+      const sorted = () => [...best.values()].sort((a, b) => a.k - b.k);
+      const fn = (line) => {
+        if (line === null || !line.startsWith('info') || /bound/.test(line)) return;
+        const sc = line.match(/score (cp|mate) (-?\d+)/), pv = line.match(/ pv (.+)$/);
+        if (!sc || !pv) return;
+        const mp = line.match(/multipv (\d+)/), dp = line.match(/ depth (\d+)/);
+        const k = mp ? +mp[1] : 1;
+        best.set(k, { k, cp: scoreToCp(sc[1], +sc[2]), pv: pv[1].trim().split(' '), depth: dp ? +dp[1] : 0 });
+        if (onInfo) onInfo(sorted());
+      };
+      this.listeners.add(fn);
+      this.searching = 'analysis';
+      const done = this._waitFor(/^bestmove (\S+)/, movetime + 30000);
+      this.send(`go movetime ${movetime}`);
+      try { await done; } finally { this.listeners.delete(fn); this.searching = null; this.send('setoption name MultiPV value 1'); }
+      return sorted();
+    });
+  }
+
+  // interrompe só buscas de análise (nunca a jogada do computador numa partida)
+  stopAnalysis() { if (this.searching === 'analysis') this.send('stop'); }
 
   // análise em força total: { cp (de quem joga), best }
   analyze(fen, movetime = 300) {
@@ -136,4 +170,5 @@ export function getEngine(kind) {
 export function loadProgress(kind) { const e = cache[kind]; return e ? e.dl : null; }
 export const engineLoaded = (kind) => !!cache[kind];
 
+export function stopAnalysis() { for (const k in cache) cache[k].stopAnalysis(); }
 export function stopAll() { for (const k in cache) cache[k].stop(); }

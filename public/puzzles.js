@@ -2,7 +2,7 @@ import { Chess } from './vendor/chess.js';
 import { getEngine } from './engine.js';
 import { winPct } from './logic.js';
 import { drawBoard, kingSquare } from './board.js';
-import { S, save } from './store.js';
+import { S, save, orientFlipped } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 let cur = null, chess = null, flipped = false, selected = null, legal = [], busy = false, solved = false, marks = {};
@@ -33,7 +33,7 @@ function load(p) {
     return;
   }
   chess = new Chess(p.fen);
-  flipped = p.color === 'b';
+  flipped = orientFlipped(p.color);
   $('pzCount').textContent = `${S.puzzles.filter((x) => x.solved > 0).length}/${S.puzzles.length} resolvidos`;
   setMsg(`Você perdeu pontos aqui (−${p.loss}%). Encontre o melhor lance para ${chess.turn() === 'w' ? 'as brancas' : 'as pretas'}.`);
   render();

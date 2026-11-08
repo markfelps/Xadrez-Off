@@ -43,6 +43,11 @@
     <p id="engStatus" class="note"></p>
 
     <label class="row">
+      <span>Orientação do tabuleiro</span>
+      <select id="orient"><option value="auto">Minha cor embaixo (padrão)</option><option value="w">Brancas sempre embaixo</option><option value="b">Pretas sempre embaixo</option></select>
+    </label>
+    <label class="check"><input id="sqNames" type="checkbox"> Mostrar o nome em cada casa (e4, d5…)</label>
+    <label class="row">
       <span>Relógio</span>
       <select id="clockPreset"></select>
     </label>
@@ -66,6 +71,9 @@
       <button id="newR">Aleatório</button>
     </div>
     <div class="buttons">
+      <button id="consBtn" class="accent">Consultor (Chess.com)</button>
+    </div>
+    <div class="buttons">
       <button id="posBtn">Posição específica…</button>
       <button id="puzBtn">Puzzles (0)</button>
     </div>
@@ -75,6 +83,11 @@
       <button id="resetRating" class="ghost">Zerar rating</button>
     </div>
     <p id="stats" class="note"></p>
+    <div class="buttons">
+      <button id="bkExport" class="ghost">Exportar backup</button>
+      <button id="bkImport" class="ghost">Importar backup</button>
+      <input id="bkFile" type="file" accept=".json,application/json" hidden>
+    </div>
     <details><summary>Histórico de partidas</summary><div id="history"></div></details>
   </section>
 </main>
@@ -89,6 +102,7 @@
   <div id="rvInfo" class="status"></div>
   <div class="buttons"><button id="rvFirst">⏮</button><button id="rvPrev">◀</button><button id="rvNext">▶</button><button id="rvLast">⏭</button></div>
   <div class="buttons"><button id="rvNextErr">Próximo erro</button><button id="rvPlay">Jogar daqui</button></div>
+  <div class="buttons"><button id="rvPgn">Copiar PGN</button><button id="rvConsult">Abrir no Consultor</button></div>
 </div></div>
 
 <div id="puzzle" class="overlay" hidden><div class="inner">
@@ -110,6 +124,31 @@
   <div class="buttons"><button id="edStd">Inicial</button><button id="edClear">Limpar</button><button id="edLoad">Carregar FEN</button></div>
   <div class="buttons"><button id="edPlayW">Jogar de brancas</button><button id="edPlayB">Jogar de pretas</button></div>
   <p class="note">Partidas a partir de posições personalizadas não valem rating.</p>
+</div></div>
+
+<div id="consult" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>Consultor</b><button id="csClose" class="x">✕</button></div>
+  <div class="note">Replique aqui os lances da partida do Chess.com (dos dois lados), tocando no tabuleiro ou digitando, e veja a melhor jogada.</div>
+  <div id="csTurn" class="status"></div>
+  <div class="cs-row">
+    <div id="csBar" class="evalbar"><div id="csBarW" class="w"></div></div>
+    <div id="csBoard" class="board"></div>
+  </div>
+  <div id="csEval" class="status"></div>
+  <div id="csLines" class="lines"></div>
+  <div class="inputrow"><input id="csInput" placeholder="Digite o lance: e4, Nf3, O-O ou e2e4" autocapitalize="off" autocomplete="off" spellcheck="false"><button id="csPlay">Jogar</button></div>
+  <div id="csMsg" class="note"></div>
+  <div class="buttons"><button id="csFirst">⏮</button><button id="csPrev">◀</button><button id="csNext">▶</button><button id="csLast">⏭</button><button id="csUndo">Desfazer</button></div>
+  <div id="csMoves" class="moves"></div>
+  <div class="custom">
+    <label>Tabuleiro<select id="csSide"><option value="w">Brancas embaixo</option><option value="b">Pretas embaixo</option></select></label>
+    <label>Análise<select id="csTime"><option value="600">Rápida</option><option value="1500">Normal</option><option value="4000">Profunda</option></select></label>
+  </div>
+  <label class="check"><input id="csPt" type="checkbox"> Digitar em português (C cavalo, B bispo, T torre, D dama, R rei)</label>
+  <label class="check"><input id="csBest" type="checkbox" checked> Mostrar o melhor lance no tabuleiro</label>
+  <textarea id="csText" rows="3" placeholder="Cole aqui o PGN ou FEN copiado do Chess.com"></textarea>
+  <div class="buttons"><button id="csLoad">Carregar PGN/FEN</button><button id="csReset">Posição inicial</button></div>
+  <div class="buttons"><button id="csCopyPgn">Copiar PGN</button><button id="csCopyFen">Copiar FEN</button></div>
 </div></div>
 
 <div id="promo" class="promo" hidden></div>

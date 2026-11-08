@@ -1,6 +1,7 @@
 import { Chess } from './vendor/chess.js';
 import { drawBoard, GLYPH } from './board.js';
 import { PRESET_POSITIONS, STANDARD_FEN } from './logic.js';
+import { orientFlipped } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const emptyGrid = () => Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -42,6 +43,7 @@ export function validate(fen) {
 
 function render() {
   drawBoard($('edBoard'), grid, {
+    flipped: orientFlipped('w'),
     onClick: (sq) => {
       const f = 'abcdefgh'.indexOf(sq[0]), r = 8 - +sq[1];
       grid[r][f] = tool === 'x' ? null : { color: tool[0], type: tool[1] };

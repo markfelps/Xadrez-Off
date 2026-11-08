@@ -2,7 +2,8 @@ import { Chess } from './vendor/chess.js';
 import { getEngine } from './engine.js';
 import { summarizeGame, pickPuzzles, winPct, CLS_LABEL } from './logic.js';
 import { drawBoard } from './board.js';
-import { S, save } from './store.js';
+import { S, save, orientFlipped } from './store.js';
+import { copyText } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const parse = (u) => ({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
@@ -53,7 +54,13 @@ function savePuzzles(game, fens, summary) {
   return n;
 }
 
-export async function openReview(game, { onPlay, onPuzzles }) {
+export function pgnOf(game) {
+  const c = game.startFen ? new Chess(game.startFen) : new Chess();
+  for (const u of game.moves) c.move(parse(u));
+  return c.pgn();
+}
+
+export async function openReview(game, { onPlay, onPuzzles, onConsult }) {
   const rv = $('review');
   rv.hidden = false;
   $('rvSummary').textContent = '';
@@ -76,7 +83,7 @@ export async function openReview(game, { onPlay, onPuzzles }) {
     (added ? `<div class="good">+${added} puzzle(s) criado(s) a partir desta derrota</div>` : '');
 
   const n = game.moves.length;
-  const flipped = game.color === 'b';
+  const flipped = orientFlipped(game.color);
   let ri = Math.max(0, sum.moves.findIndex((m) => m.mover === game.color && (m.cls === 'blunder' || m.cls === 'mistake')));
   if (ri < 0) ri = 0;
 
@@ -127,6 +134,8 @@ export async function openReview(game, { onPlay, onPuzzles }) {
     const errs = sum.moves.filter((m) => m.mover === game.color && (m.cls === 'blunder' || m.cls === 'mistake')).map((m) => m.k);
     if (errs.length) go(errs.find((k) => k > ri) ?? errs[0]);
   };
+  $('rvPgn').onclick = async () => { $('rvInfo').textContent = (await copyText(pgnOf(game))) ? 'PGN copiado ✓ (cole no Chess.com ou em qualquer analisador)' : 'Não consegui copiar.'; };
+  $('rvConsult').onclick = () => { rv.hidden = true; onConsult && onConsult(game); };
   $('rvPlay').onclick = () => { rv.hidden = true; onPlay(fens[ri], game.color, game.oppElo); };
   $('rvChart').onclick = (e) => {
     const r = e.currentTarget.getBoundingClientRect();

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Chess } from '../public/vendor/chess.js';
+import { parseMoveInput } from '../public/notation.js';
 import { expectedScore, updateRating, newPlayer, enginePlan, ladderOpponent, ELO_MAX, winPct, summarizeGame, pickPuzzles, scoreToCp, PRESET_POSITIONS, classifyLoss, clockConfig, formatClock, engineMovetime, UNDO_COST } from '../public/logic.js';
 
 // --- Elo ---
@@ -57,6 +58,27 @@ assert.equal(engineMovetime(8000, 60000, 0), 3000);       // 1 min restante: no 
 assert.equal(engineMovetime(500, 600000, 0), 500);         // nunca passa do plano
 assert.equal(engineMovetime(8000, 100, 0), 50);            // mínimo de 50 ms
 assert.equal(UNDO_COST, 5);
+
+// --- digitação de lances ---
+{
+  const c = new Chess();
+  const san = (txt, pt) => { const m = parseMoveInput(c, txt, pt); return m && m.san; };
+  assert.equal(san('e4'), 'e4'); assert.equal(san('e2e4'), 'e4'); assert.equal(san('e2-e4'), 'e4');
+  assert.equal(san('Nf3'), 'Nf3'); assert.equal(san('nf3'), 'Nf3'); assert.equal(san('g1f3'), 'Nf3');
+  assert.equal(san('Cf3', true), 'Nf3');      // português: C = cavalo
+  assert.equal(san('Cf3', false), null);      // sem o modo PT, "Cf3" não vale
+  assert.equal(san('e5'), null);              // ilegal na posição inicial
+  assert.equal(san('Nf3+'), 'Nf3');           // sinais de xeque são ignorados
+  assert.equal(parseMoveInput(c, '', false), null);
+  for (const m of ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5']) c.move(m);
+  assert.equal(san('O-O'), 'O-O'); assert.equal(san('0-0'), 'O-O'); assert.equal(san('e1g1'), 'O-O');
+  assert.equal(san('bc4'), null);             // não existe peão em b -> c4 (e o bispo já está lá)
+  const p = new Chess('8/4P3/8/8/8/k7/8/K7 w - - 0 1');
+  assert.equal(parseMoveInput(p, 'e8=Q').promotion, 'q');
+  assert.equal(parseMoveInput(p, 'e7e8q').promotion, 'q'); assert.equal(parseMoveInput(p, 'e7e8').promotion, 'q'); // sem letra = dama
+  assert.equal(parseMoveInput(p, 'e7e8n').promotion, 'n'); assert.equal(parseMoveInput(p, 'e8D', true).promotion, 'q'); assert.equal(parseMoveInput(p, 'e8=T', true).promotion, 'r');
+  assert.equal(parseMoveInput(p, 'e8Q').promotion, 'q');
+}
 
 // --- motor real via Node: partida curta lite vs lite (limitado 1500 x ilimitado) ---
 import { spawn } from 'node:child_process';
