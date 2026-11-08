@@ -3,10 +3,25 @@
 import { scoreToCp } from './logic.js';
 
 class UciEngine {
-  constructor(file) {
+  constructor(file, opts = {}) {
     this.chain = Promise.resolve();
+    this.hash = opts.hash || 64;
+    this.initTimeout = opts.initTimeout || 60000;
     this.worker = new Worker(file);
     this.listeners = new Set();
+    this.failed = null;
+    // progresso do download do .wasm (o stockfish.js informa por um MessageChannel); serve de vigia contra travamentos
+    this.stallMs = opts.stallMs || 20000;
+    this.dl = { t: Date.now(), done: false, percent: 0, text: '' };
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (ev) => {
+      const d = ev.data || {};
+      this.dl.t = Date.now(); this.dl.started = true; this.dl.percent = d.percent || 0; this.dl.text = d.speedText || '';
+      if (d.percent >= 1) this.dl.done = true;
+    };
+    this.worker.postMessage({ progressPort: ch.port2 }, [ch.port2]);
+    // falha de carregamento do worker (arquivo ausente, wasm inválido): rejeita na hora, sem esperar timeout
+    this.worker.onerror = (ev) => { this.failed = new Error('falha ao carregar o motor' + (ev && ev.message ? ': ' + ev.message : '')); for (const l of [...this.listeners]) l(null); };
     this.worker.onmessage = (e) => {
       const line = typeof e.data === 'string' ? e.data : String(e.data);
       for (const l of [...this.listeners]) l(line);
@@ -18,6 +33,7 @@ class UciEngine {
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => { this.listeners.delete(fn); reject(new Error('timeout ' + re)); }, timeout);
       const fn = (line) => {
+        if (line === null) { clearTimeout(t); this.listeners.delete(fn); return reject(this.failed); }
         const m = line.match(re);
         if (m) { clearTimeout(t); this.listeners.delete(fn); resolve(m); }
       };
@@ -28,15 +44,26 @@ class UciEngine {
   send(cmd) { this.worker.postMessage(cmd); }
 
   async _init() {
-    const ok = this._waitFor(/^uciok/);
-    this.send('uci');
-    await ok;
-    this.send('setoption name Hash value 64');
-    await this.isReady();
+    // vigia: sem nenhum dado novo do download por stallMs => falha imediatamente (em vez de esperar o timeout longo)
+    const wd = setInterval(() => {
+      // nenhum byte recebido ainda (404/bloqueio) cai em 12s; download iniciado e parado cai em stallMs
+      const limit = this.dl.started ? this.stallMs : Math.min(this.stallMs, 12000);
+      if (!this.dl.done && Date.now() - this.dl.t > limit) {
+        this.failed = new Error(`o download do motor não avançou (${Math.round(limit / 1000)}s sem dados)`);
+        for (const l of [...this.listeners]) l(null);
+      }
+    }, 1000);
+    try {
+      const ok = this._waitFor(/^uciok/, this.initTimeout);
+      this.send('uci');
+      await ok;
+      this.send(`setoption name Hash value ${this.hash}`);
+      await this.isReady(this.initTimeout);
+    } finally { clearInterval(wd); }
   }
 
-  async isReady() {
-    const ok = this._waitFor(/^readyok/);
+  async isReady(timeout = 60000) {
+    const ok = this._waitFor(/^readyok/, timeout);
     this.send('isready');
     await ok;
   }
@@ -48,7 +75,7 @@ class UciEngine {
   bestMove(plan, moves, startFen = null) {
     return this.run(async () => {
       await this.ready;
-      this.send('ucinewgame');
+      if (moves.length <= 1) this.send('ucinewgame'); // só no começo da partida (evita reinicializar a cada lance)
       this.send(`setoption name UCI_LimitStrength value ${plan.limit ? 'true' : 'false'}`);
       if (plan.limit) this.send(`setoption name UCI_Elo value ${plan.uciElo}`);
       await this.isReady();
@@ -91,10 +118,22 @@ const FILES = {
   full: 'engine/stockfish-19-single.js',
 };
 const cache = {};
+const OPTS = {
+  lite: { hash: 64, initTimeout: 60000 },
+  full: { hash: 128, initTimeout: 300000, stallMs: 25000 }, // 95 MB: compilar pode levar minutos em máquina lenta; só o download parado derruba
+};
 
 export function getEngine(kind) {
-  if (!cache[kind]) cache[kind] = new UciEngine(FILES[kind]);
+  if (!cache[kind]) {
+    const e = new UciEngine(FILES[kind], OPTS[kind]);
+    cache[kind] = e;
+    // se falhar ao iniciar, descarta para permitir nova tentativa (e fallback)
+    e.ready.catch(() => { if (cache[kind] === e) { try { e.terminate(); } catch {} delete cache[kind]; } });
+  }
   return cache[kind];
 }
+
+export function loadProgress(kind) { const e = cache[kind]; return e ? e.dl : null; }
+export const engineLoaded = (kind) => !!cache[kind];
 
 export function stopAll() { for (const k in cache) cache[k].stop(); }

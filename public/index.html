@@ -18,17 +18,19 @@
     <div class="you">
       <span class="label">Seu rating</span>
       <span id="myRating" class="big">1200</span>
+      <span id="clockMe" class="clock"></span>
       <span id="lastDelta" class="delta"></span>
     </div>
     <div class="opp">
       <span class="label" id="oppName">Adversário</span>
       <span id="oppRating" class="big">1500</span>
+      <span id="clockOpp" class="clock"></span>
     </div>
   </header>
 
   <div id="status" class="status">Escolha o nível e comece.</div>
   <div id="board" class="board" aria-label="Tabuleiro"></div>
-  <div class="buttons under"><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
+  <div class="buttons under"><button id="undo" disabled>Voltar jogada</button><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
   <div id="moves" class="moves"></div>
 
   <section class="panel">
@@ -38,7 +40,18 @@
     </label>
     <div id="presets" class="presets"></div>
     <p id="eloNote" class="note"></p>
+    <p id="engStatus" class="note"></p>
 
+    <label class="row">
+      <span>Relógio</span>
+      <select id="clockPreset"></select>
+    </label>
+    <div id="clockCustom" class="custom" hidden>
+      <label>Você (min)<input id="cMin" type="number" min="0.1" step="0.5"></label>
+      <label>Incremento (s)<input id="cInc" type="number" min="0" step="1"></label>
+      <label>Computador (min)<input id="cEng" type="number" min="0.1" step="0.5"></label>
+    </div>
+    <p id="clockNote" class="note"></p>
     <label class="row">
       <span>Dicas</span>
       <select id="hintMode"><option value="off">Desligadas</option><option value="cost">Com custo (vale rating)</option><option value="free">Ilimitadas (sem rating)</option></select>

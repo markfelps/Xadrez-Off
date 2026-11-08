@@ -54,7 +54,7 @@ export function enginePlan(elo) {
   if (elo < 3500) {
     return { engine: 'lite', limit: false, uciElo: null, movetime: 600 + (elo - SF_MAX_ELO) * 8, randomP: 0 };
   }
-  return { engine: 'full', limit: false, uciElo: null, movetime: 2000 + (elo - 3500) * 40, randomP: 0 };
+  return { engine: 'full', limit: false, uciElo: null, movetime: 1500 + (elo - 3500) * 25, randomP: 0 };
 }
 
 export function levelName(elo) {
@@ -130,3 +130,38 @@ export const PRESET_POSITIONS = [
   { name: 'Siciliana (1.e4 c5)', fen: 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2' },
   { name: 'Gambito da Dama (1.d4 d5 2.c4)', fen: 'rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2' },
 ];
+
+// ---------- relógio ----------
+export const UNDO_COST = 5;
+// [id, rótulo, minutos, incremento em s]
+export const CLOCK_PRESETS = [
+  ['none', 'Sem relógio', 0, 0], ['1+0', '1 min', 1, 0], ['3+2', '3 min + 2s', 3, 2], ['5+0', '5 min', 5, 0],
+  ['10+0', '10 min', 10, 0], ['15+10', '15 min + 10s', 15, 10], ['30+0', '30 min', 30, 0], ['custom', 'Personalizado…', 0, 0],
+];
+
+// retorna null (sem relógio) ou { minMs, incMs, engMs }
+export function clockConfig(preset, c = {}) {
+  if (preset === 'none') return null;
+  if (preset === 'custom') {
+    const min = Math.max(0.1, +c.min || 10);
+    const inc = Math.max(0, +c.inc || 0);
+    const eng = Math.max(0.1, +c.engMin || min);
+    return { minMs: Math.round(min * 60000), incMs: Math.round(inc * 1000), engMs: Math.round(eng * 60000) };
+  }
+  const p = CLOCK_PRESETS.find((x) => x[0] === preset);
+  if (!p) return null;
+  return { minMs: p[2] * 60000, incMs: p[3] * 1000, engMs: p[2] * 60000 };
+}
+
+export function formatClock(ms) {
+  ms = Math.max(0, ms);
+  if (ms < 10000) return '0:' + (ms / 1000).toFixed(1).padStart(4, '0');
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// tempo de pensamento do computador, limitado pelo que resta no relógio dele
+export function engineMovetime(planMs, remainingMs, incMs = 0) {
+  if (remainingMs == null) return planMs;
+  return Math.max(50, Math.min(planMs, Math.round(remainingMs * 0.05 + incMs * 0.7)));
+}

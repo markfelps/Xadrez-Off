@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Chess } from '../public/vendor/chess.js';
-import { expectedScore, updateRating, newPlayer, enginePlan, ladderOpponent, ELO_MAX, winPct, summarizeGame, pickPuzzles, scoreToCp, PRESET_POSITIONS, classifyLoss } from '../public/logic.js';
+import { expectedScore, updateRating, newPlayer, enginePlan, ladderOpponent, ELO_MAX, winPct, summarizeGame, pickPuzzles, scoreToCp, PRESET_POSITIONS, classifyLoss, clockConfig, formatClock, engineMovetime, UNDO_COST } from '../public/logic.js';
 
 // --- Elo ---
 assert.equal(expectedScore(1500, 1500), 0.5);
@@ -44,6 +44,19 @@ assert.equal(pickPuzzles(summarizeGame([-900, -900, -9000], 'w', 'w'), 'w').leng
 assert.equal(classifyLoss(12), 'mistake');
 // --- posições prontas são jogáveis ---
 for (const p of PRESET_POSITIONS) { const c = new Chess(p.fen); assert.ok(!c.isGameOver(), p.name); assert.ok(c.moves().length > 0, p.name); }
+
+// --- relógio ---
+assert.equal(clockConfig('none'), null);
+assert.deepEqual(clockConfig('3+2'), { minMs: 180000, incMs: 2000, engMs: 180000 });
+assert.deepEqual(clockConfig('custom', { min: 5, inc: 3, engMin: 1 }), { minMs: 300000, incMs: 3000, engMs: 60000 });
+assert.equal(clockConfig('custom', { min: 5, inc: 0, engMin: '' }).engMs, 300000); // vazio = igual ao seu
+assert.equal(clockConfig('custom', { min: 0, inc: -4 }).incMs, 0); // incremento negativo vira 0
+assert.equal(formatClock(61000), '1:01'); assert.equal(formatClock(3599000), '59:59'); assert.equal(formatClock(9400), '0:09.4'); assert.equal(formatClock(-5), '0:00.0');
+assert.equal(engineMovetime(8000, null), 8000);
+assert.equal(engineMovetime(8000, 60000, 0), 3000);       // 1 min restante: no máx 3 s
+assert.equal(engineMovetime(500, 600000, 0), 500);         // nunca passa do plano
+assert.equal(engineMovetime(8000, 100, 0), 50);            // mínimo de 50 ms
+assert.equal(UNDO_COST, 5);
 
 // --- motor real via Node: partida curta lite vs lite (limitado 1500 x ilimitado) ---
 import { spawn } from 'node:child_process';
