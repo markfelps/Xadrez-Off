@@ -118,3 +118,23 @@ while (!g.isGameOver() && moves.length < 40) {
 console.log('motor ok —', moves.length, 'lances legais jogados:', moves.slice(0, 8).join(' '), '…');
 w.eng.terminate(); b.eng.terminate();
 console.log('todos os testes passaram');
+
+// ---- livro de aberturas
+{
+  const { bookMove, BOOK_LINES } = await import('../public/book.js');
+  const first = bookMove([]);
+  if (!first || !/^[a-h][1-8][a-h][1-8]/.test(first.uci)) throw new Error('livro: primeiro lance inválido');
+  if (bookMove(['a2a3'])) throw new Error('livro: não deveria ter lance após a2a3');
+  // todo lance escolhido a partir de qualquer prefixo de linha é legal
+  const { Chess: C } = await import('../public/vendor/chess.js');
+  for (let i = 0; i < 300; i++) {
+    const g = new C(); const mv = [];
+    for (let p = 0; p < 30; p++) {
+      const b = bookMove(mv);
+      if (!b) break;
+      g.move({ from: b.uci.slice(0, 2), to: b.uci.slice(2, 4), promotion: b.uci[4] });
+      mv.push(b.uci);
+    }
+  }
+  console.log(`livro ok — ${BOOK_LINES.length} linhas, 300 partidas de teoria sem lance ilegal`);
+}

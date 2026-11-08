@@ -58,6 +58,8 @@ class UciEngine {
       this.send('uci');
       await ok;
       this.send(`setoption name Hash value ${this.hash}`);
+      this.send('setoption name Ponder value true');
+      this.curHash = this.hash;
       await this.isReady(this.initTimeout);
     } finally { clearInterval(wd); }
   }
@@ -71,8 +73,62 @@ class UciEngine {
   // fila: um comando de busca por vez
   run(fn) { const p = this.chain.then(fn); this.chain = p.catch(() => {}); return p; }
 
+  // muda o tamanho da tabela hash (MB) — vale a partir da próxima busca
+  setHash(mb) {
+    this._cancelPonder();
+    this.hash = mb;
+    return this.run(async () => {
+      await this.ready;
+      if (this.curHash === mb) return;
+      this.send(`setoption name Hash value ${mb}`);
+      this.curHash = mb;
+      await this.isReady();
+    }).catch(() => {});
+  }
+
+  // ---- ponder: pensa na posição prevista enquanto o usuário pensa; se ele jogar o lance previsto, a resposta já sai pronta
+  _cancelPonder() {
+    const st = this.pstate;
+    this.pstate = null;
+    if (!st) return;
+    st.cancelled = true;
+    if (st.started && !st.finished) this.send('stop');
+  }
+
+  startPonder(plan, moves, startFen, ponderMove) {
+    this._cancelPonder();
+    if (!ponderMove || plan.limit) return;
+    const st = { moves: [...moves, ponderMove], started: false, finished: false, cancelled: false };
+    this.pstate = st;
+    st.done = this.run(async () => {
+      await this.ready;
+      if (st.cancelled) return null;
+      const base = startFen ? `position fen ${startFen}` : 'position startpos';
+      this.send(base + ' moves ' + st.moves.join(' '));
+      const done = this._waitFor(/^bestmove (\S+)(?: ponder (\S+))?/, 6 * 3600 * 1000);
+      this.searching = 'ponder';
+      st.started = true;
+      this.send(`go ponder movetime ${plan.movetime}`);
+      try { return await done; } finally { st.finished = true; this.searching = null; }
+    }).catch(() => null);
+  }
+
   // plan vem de enginePlan(); moves = lances UCI desde startFen (ou posição inicial)
+  // devolve o lance (UCI); this.lastPonder guarda o lance previsto do usuário (ou null)
   bestMove(plan, moves, startFen = null) {
+    const st = this.pstate;
+    if (st && st.started && !st.finished && !plan.limit && st.moves.length === moves.length && st.moves.every((m, i) => m === moves[i])) {
+      // acertou a previsão: continua a busca já em andamento (ela tem o tempo todo em que o usuário pensou)
+      this.pstate = null;
+      this.searching = 'game';
+      this.send('ponderhit');
+      return st.done.then((r) => {
+        if (!r) throw new Error('busca de ponder interrompida');
+        this.lastPonder = r[2] || null;
+        return r[1];
+      });
+    }
+    this._cancelPonder();
     return this.run(async () => {
       await this.ready;
       if (moves.length <= 1) this.send('ucinewgame'); // só no começo da partida (evita reinicializar a cada lance)
@@ -81,15 +137,16 @@ class UciEngine {
       await this.isReady();
       const base = startFen ? `position fen ${startFen}` : 'position startpos';
       this.send(base + (moves.length ? ' moves ' + moves.join(' ') : ''));
-      const done = this._waitFor(/^bestmove (\S+)/, plan.movetime + 30000);
+      const done = this._waitFor(/^bestmove (\S+)(?: ponder (\S+))?/, plan.movetime + 30000);
       this.searching = 'game';
       this.send(`go movetime ${plan.movetime}`);
-      try { return (await done)[1]; } finally { this.searching = null; }
+      try { const m = await done; this.lastPonder = m[2] || null; return m[1]; } finally { this.searching = null; }
     });
   }
 
   // análise com várias linhas (MultiPV). onInfo recebe as linhas parciais; opts.cancelled() evita rodar se já ficou obsoleta
   analyzeMulti(fen, movetime = 1500, multipv = 3, onInfo = null, opts = {}) {
+    this._cancelPonder();
     return this.run(async () => {
       if (opts.cancelled && opts.cancelled()) return [];
       await this.ready;
@@ -123,6 +180,7 @@ class UciEngine {
 
   // análise em força total: { cp (de quem joga), best }
   analyze(fen, movetime = 300) {
+    this._cancelPonder();
     return this.run(async () => {
       await this.ready;
       this.send('setoption name UCI_LimitStrength value false');
@@ -143,7 +201,7 @@ class UciEngine {
     });
   }
 
-  stop() { this.send('stop'); }
+  stop() { this._cancelPonder(); this.send('stop'); }
   terminate() { this.worker.terminate(); }
 }
 
@@ -156,6 +214,15 @@ const OPTS = {
   lite: { hash: 64, initTimeout: 60000 },
   full: { hash: 128, initTimeout: 300000, stallMs: 25000 }, // 95 MB: compilar pode levar minutos em máquina lenta; só o download parado derruba
 };
+// modo PC: tabela hash grande (mais profundidade em lances longos)
+const HASH_PC = { lite: 256, full: 512 };
+const HASH_BASE = { lite: OPTS.lite.hash, full: OPTS.full.hash };
+export function setBoost(on) {
+  for (const k of Object.keys(OPTS)) {
+    OPTS[k].hash = on ? HASH_PC[k] : HASH_BASE[k];
+    if (cache[k]) cache[k].setHash(OPTS[k].hash);
+  }
+}
 
 export function getEngine(kind) {
   if (!cache[kind]) {

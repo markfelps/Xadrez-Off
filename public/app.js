@@ -1,5 +1,6 @@
 import { Chess } from './vendor/chess.js';
-import { getEngine, stopAll, engineLoaded, loadProgress } from './engine.js';
+import { getEngine, stopAll, engineLoaded, loadProgress, setBoost } from './engine.js';
+import { bookMove } from './book.js';
 import {
   ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent,
   HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime,
@@ -86,6 +87,9 @@ function buildClockUi() {
 const timeOdds = () => clock.on && clock.minMs !== clock.engMs;
 const isRated = () => !startFen && S.hintMode !== 'free' && !timeOdds();
 const penalty = () => hintCost + undoCost;
+
+// ---------- modo PC: hash grande, ponder (pensar no seu tempo) e livro de aberturas ----------
+const boost = () => (S.pcBoost == null ? !matchMedia('(pointer: coarse)').matches : S.pcBoost);
 
 // ---------- nível ----------
 const PRESETS = [
@@ -245,16 +249,21 @@ async function engineTurn() {
   updateControls();
   const plan = enginePlan(gameElo);
   if (plan.engine === 'full' && !$('fullEngine').checked) { plan.engine = 'lite'; plan.movetime = Math.round(plan.movetime * 1.5); }
-  let uci;
+  let uci, eng = null, book = null;
   try {
-    if (plan.randomP && Math.random() < plan.randomP) {
+    book = boost() && !startFen && gameElo >= 2000 ? bookMove(uciHistory()) : null;
+    if (book) {
+      // dentro da teoria: joga o lance do livro (com uma pequena pausa para parecer natural)
+      clockStart(engColor);
+      await new Promise((r) => setTimeout(r, 400 + Math.random() * 700));
+      uci = book.uci;
+    } else if (plan.randomP && Math.random() < plan.randomP) {
       const all = chess.moves({ verbose: true });
       const m = all[Math.floor(Math.random() * all.length)];
       clockStart(engColor);
       await new Promise((r) => setTimeout(r, 300));
       uci = m.from + m.to + (m.promotion || '');
     } else {
-      let eng;
       try { eng = await ensureEngine(plan.engine); } catch (err) {
         if (plan.engine !== 'full') throw err;
         // motor completo falhou: cai para o leve em vez de travar a partida
@@ -277,7 +286,12 @@ async function engineTurn() {
   if (clock.on) clock[engColor] += clock.incMs;
   chess.move(parse(uci));
   render();
-  if (!checkEnd()) { clockStart(myColor); setStatus(chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.'); }
+  if (!checkEnd()) {
+    clockStart(myColor);
+    setStatus((chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.') + (book ? ` (teoria${book.name ? ': ' + book.name : ''})` : ''));
+    // ponder: continua pensando, na posição prevista, enquanto você joga
+    if (boost() && eng && !book && !plan.limit) eng.startPonder(plan, uciHistory(), startFen, eng.lastPonder);
+  }
 }
 
 function checkEnd() {
@@ -293,6 +307,7 @@ function checkEnd() {
 }
 
 function finish(score, msg) {
+  stopAll();
   clockStop();
   active = false;
   $('resign').disabled = true;
@@ -360,6 +375,7 @@ function undoMove() {
     gameId++; thinking = false; stopAll();
     chess.undo();
   } else if (chess.turn() === myColor) {
+    stopAll();
     chess.undo(); chess.undo();
   } else return;
   if (isRated()) undoCost += UNDO_COST;
@@ -418,6 +434,7 @@ async function hint() {
   const fen = chess.fen();
   if (!hintMv || hintMv.fen !== fen) {
     $('hint').disabled = true;
+    stopAll(); // interrompe o ponder para não competir pela CPU
     setStatus('Calculando dica…');
     const r = await getEngine('lite').analyze(fen, 700);
     if (chess.fen() !== fen || !active) return;
@@ -470,6 +487,9 @@ $('undo').onclick = undoMove;
 $('liveEdit').onclick = liveEdit;
 $('cfOk').onclick = () => { if (pending && active && !thinking) playMove(pending); };
 $('cfNo').onclick = () => { clearPending(); selected = null; legal = []; setStatus('Sua vez.'); render(); };
+$('pcBoost').checked = boost();
+$('pcBoost').onchange = () => { S.pcBoost = $('pcBoost').checked; save(); setBoost(S.pcBoost); if (!S.pcBoost) stopAll(); };
+setBoost(boost());
 $('confirmMove').checked = S.confirmMove;
 $('confirmMove').onchange = () => { S.confirmMove = $('confirmMove').checked; save(); if (!S.confirmMove) clearPending(); };
 $('hintMode').value = S.hintMode;
