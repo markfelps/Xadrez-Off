@@ -24,7 +24,7 @@ let chess = new Chess();
 let myColor = 'w', flipped = false, selected = null, legal = [];
 let thinking = false, active = false, gameId = 0, gameElo = elo;
 let startFen = null;            // null = posição inicial padrão
-let hintCost = 0, undoCost = 0, hintMv = null, hintMarks = {};
+let hintCost = 0, undoCost = 0, hintMv = null, hintMarks = {}, pending = null;
 let lastGame = null;
 
 // ---------- relógio ----------
@@ -184,12 +184,26 @@ function render() {
   drawClock();
 }
 
+function clearPending() { pending = null; hintMarks = {}; $('confirmBar').hidden = true; }
+
+// com "confirmar lance" ligado, o lance só é jogado depois do toque em Confirmar
+function tryMove(m) {
+  if (!S.confirmMove) return playMove(m);
+  pending = m;
+  hintMarks = { [m.from]: 'pendFrom', [m.to]: 'pendTo' };
+  $('confirmBar').hidden = false;
+  setStatus('Confirmar ' + chess.move({ ...m, promotion: m.promotion || 'q' }).san + '?');
+  chess.undo();
+  render();
+}
+
 function onSquare(name) {
   if (!active || thinking || chess.turn() !== myColor) return;
+  if (pending) { clearPending(); selected = null; legal = []; setStatus('Sua vez.'); }
   const mv = legal.filter((m) => m.to === name);
   if (selected && mv.length) {
     if (mv.some((m) => m.promotion)) return askPromotion(mv[0].from, name);
-    return playMove({ from: mv[0].from, to: name });
+    return tryMove({ from: mv[0].from, to: name });
   }
   const p = chess.get(name);
   if (p && p.color === myColor) { selected = name; legal = chess.moves({ square: name, verbose: true }); } else { selected = null; legal = []; }
@@ -202,7 +216,7 @@ function askPromotion(from, to) {
   for (const t of ['q', 'r', 'b', 'n']) {
     const b = document.createElement('button');
     b.textContent = { q: '♛', r: '♜', b: '♝', n: '♞' }[t];
-    b.onclick = () => { box.hidden = true; playMove({ from, to, promotion: t }); };
+    b.onclick = () => { box.hidden = true; tryMove({ from, to, promotion: t }); };
     box.appendChild(b);
   }
   box.hidden = false;
@@ -210,6 +224,7 @@ function askPromotion(from, to) {
 
 // ---------- fluxo ----------
 function playMove(m) {
+  clearPending();
   selected = null; legal = []; hintMarks = {}; hintMv = null;
   try { chess.move(m); } catch { return render(); }
   clockStop();
@@ -320,7 +335,7 @@ function newGame(color, fen = null, oppElo = null) {
   flipped = orientFlipped(myColor);
   gameElo = elo;
   active = true; thinking = false; selected = null; legal = [];
-  hintCost = 0; undoCost = 0; hintMarks = {}; hintMv = null;
+  hintCost = 0; undoCost = 0; hintMarks = {}; hintMv = null; clearPending();
   const cfg = clockConfig(S.clock.preset, S.clock);
   clock.on = !!cfg;
   if (cfg) { clock.minMs = cfg.minMs; clock.engMs = cfg.engMs; clock.incMs = cfg.incMs; clock[myColor] = cfg.minMs; clock[opp(myColor)] = cfg.engMs; }
@@ -348,10 +363,36 @@ function undoMove() {
     chess.undo(); chess.undo();
   } else return;
   if (isRated()) undoCost += UNDO_COST;
+  clearPending();
   selected = null; legal = []; hintMarks = {}; hintMv = null;
   clockStop(); clockStart(myColor);
   render();
   setStatus('Lance desfeito. Sua vez.');
+}
+
+// ---------- editar a posição durante a partida ----------
+function resumeAfterEdit(prefix = '') {
+  render();
+  if (!active) return;
+  if (chess.turn() === myColor) { clockStart(myColor); setStatus(prefix + (chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.')); }
+  else engineTurn();
+}
+
+function liveEdit() {
+  if (!active) return;
+  gameId++; thinking = false; stopAll(); clockStop(); clearPending();
+  selected = null; legal = []; hintMv = null;
+  setStatus('Editando a posição… (relógio parado)');
+  updateControls();
+  openEditor({
+    live: true, fen: chess.fen(), flipped,
+    onCancel: () => resumeAfterEdit(),
+    onApply: (fen) => {
+      chess = new Chess(fen);
+      startFen = fen;            // a partida passa a ser de posição personalizada: sem rating
+      resumeAfterEdit('Posição editada (sem rating). ');
+    },
+  });
 }
 
 // ---------- dicas / controles ----------
@@ -367,6 +408,7 @@ function updateControls() {
     : 'Dica';
   $('hintNote').textContent = S.hintMode === 'free' ? 'Dicas ilimitadas: a partida não vale rating.'
     : S.hintMode === 'cost' ? 'Dica 1 mostra a peça (−5), a 2ª mostra o destino (−5). O custo sai do seu rating no fim da partida.' : '';
+  $('liveEdit').disabled = !active;
   $('undo').disabled = !(active && userMoves() >= 1 && (thinking || chess.turn() === myColor));
   $('undo').textContent = isRated() ? `Voltar jogada (−${UNDO_COST})` : 'Voltar jogada';
 }
@@ -425,6 +467,11 @@ $('resign').onclick = () => { if (active && confirm('Desistir da partida?')) { g
 $('resetRating').onclick = () => { if (confirm('Zerar rating?')) { player = Object.assign(player, { rating: 1200, games: 0, peak: 1200, wins: 0, draws: 0, losses: 0 }); S.player = player; save(); renderLevel(); } };
 $('hint').onclick = hint;
 $('undo').onclick = undoMove;
+$('liveEdit').onclick = liveEdit;
+$('cfOk').onclick = () => { if (pending && active && !thinking) playMove(pending); };
+$('cfNo').onclick = () => { clearPending(); selected = null; legal = []; setStatus('Sua vez.'); render(); };
+$('confirmMove').checked = S.confirmMove;
+$('confirmMove').onchange = () => { S.confirmMove = $('confirmMove').checked; save(); if (!S.confirmMove) clearPending(); };
 $('hintMode').value = S.hintMode;
 $('hintMode').onchange = () => { S.hintMode = $('hintMode').value; save(); render(); };
 $('reviewBtn').onclick = () => lastGame && review(lastGame);

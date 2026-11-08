@@ -7,6 +7,7 @@ const DEFAULTS = {
   elo: 1500, games: [], puzzles: [], hintMode: 'off',
   orient: 'auto',            // auto = minha cor embaixo | w | b
   sqNames: false,            // nome da casa dentro de cada casa
+  confirmMove: false,        // pedir confirmação antes de jogar o lance
   consultSide: 'w', csTime: 1500, csPt: false, csBest: true,
 };
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };

@@ -30,7 +30,8 @@
 
   <div id="status" class="status">Escolha o nível e comece.</div>
   <div id="board" class="board" aria-label="Tabuleiro"></div>
-  <div class="buttons under"><button id="undo" disabled>Voltar jogada</button><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
+  <div class="buttons under"><button id="undo" disabled>Voltar jogada</button><button id="liveEdit" disabled>Editar posição</button><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
+  <div id="confirmBar" class="buttons under" hidden><button id="cfOk" class="accent">Confirmar lance</button><button id="cfNo">Cancelar</button></div>
   <div id="moves" class="moves"></div>
 
   <section class="panel">
@@ -47,6 +48,7 @@
       <select id="orient"><option value="auto">Minha cor embaixo (padrão)</option><option value="w">Brancas sempre embaixo</option><option value="b">Pretas sempre embaixo</option></select>
     </label>
     <label class="check"><input id="sqNames" type="checkbox"> Mostrar o nome em cada casa (e4, d5…)</label>
+    <label class="check"><input id="confirmMove" type="checkbox"> Confirmar o lance antes de jogar (evita toque errado)</label>
     <label class="row">
       <span>Relógio</span>
       <select id="clockPreset"></select>
@@ -114,15 +116,17 @@
 </div></div>
 
 <div id="editor" class="overlay" hidden><div class="inner">
-  <div class="ov-head"><b>Posição específica</b><button id="edClose" class="x">✕</button></div>
+  <div class="ov-head"><b id="edTitle">Posição específica</b><button id="edClose" class="x">✕</button></div>
   <select id="edPreset"><option value="">Posições prontas…</option></select>
   <div id="edBoard" class="board"></div>
   <div id="edPalette" class="palette"></div>
   <label class="row"><span>Quem joga primeiro</span><select id="edTurn"><option value="w">Brancas</option><option value="b">Pretas</option></select></label>
   <input id="edFen" class="fen" spellcheck="false" autocapitalize="off">
   <div id="edMsg" class="status badtxt"></div>
-  <div class="buttons"><button id="edStd">Inicial</button><button id="edClear">Limpar</button><button id="edLoad">Carregar FEN</button></div>
-  <div class="buttons"><button id="edPlayW">Jogar de brancas</button><button id="edPlayB">Jogar de pretas</button></div>
+  <div class="buttons"><button id="edStd">Inicial</button><button id="edClear">Limpar</button><button id="edFlip">Virar</button><button id="edLoad">Carregar FEN</button></div>
+  <div id="edPlayRow" class="buttons"><button id="edPlayW">Jogar de brancas</button><button id="edPlayB">Jogar de pretas</button></div>
+  <div id="edLiveRow" class="buttons" hidden><button id="edApply" class="accent">Aplicar e continuar a partida</button></div>
+  <p class="note">Arraste as peças (da paleta ou do tabuleiro). Soltar fora do tabuleiro apaga. Ou toque numa peça e depois na casa de destino.</p>
   <p class="note">Partidas a partir de posições personalizadas não valem rating.</p>
 </div></div>
 
