@@ -1,0 +1,26 @@
+{
+  "name": "xadrez-offline",
+  "version": "1.0.0",
+  "description": "Xadrez offline contra Stockfish com rating Elo",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node tests/test.mjs",
+    "www": "node build-www.cjs",
+    "apk:sync": "node build-www.cjs && npx cap sync android",
+    "apk:debug": "npm run apk:sync && cd android && ./gradlew assembleDebug",
+    "postinstall": "node setup-engine.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "chess.js": "^1.4.0",
+    "stockfish": "^19.0.1"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Xadrez Offline</string>
+    <string name="title_activity_main">Xadrez Offline</string>
+    <string name="package_name">com.marcos.xadrezoffline</string>
+    <string name="custom_url_scheme">com.marcos.xadrezoffline</string>
+</resources>

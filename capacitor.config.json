@@ -1,0 +1,6 @@
+{
+  "appId": "com.marcos.xadrezoffline",
+  "appName": "Xadrez Offline",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1d24">
+<link rel="icon" href="data:,">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+<title>Xadrez Offline</title>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="you">
+      <span class="label">Seu rating</span>
+      <span id="myRating" class="big">1200</span>
+      <span id="lastDelta" class="delta"></span>
+    </div>
+    <div class="opp">
+      <span class="label" id="oppName">Adversário</span>
+      <span id="oppRating" class="big">1500</span>
+    </div>
+  </header>
+
+  <div id="status" class="status">Escolha o nível e comece.</div>
+  <div id="board" class="board" aria-label="Tabuleiro"></div>
+  <div class="buttons under"><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
+  <div id="moves" class="moves"></div>
+
+  <section class="panel">
+    <label class="row">
+      <span>Nível do adversário: <b id="eloLabel">1500</b> <small id="eloName"></small></span>
+      <input id="eloSlider" type="range" min="400" max="3650" step="50" value="1500">
+    </label>
+    <div id="presets" class="presets"></div>
+    <p id="eloNote" class="note"></p>
+
+    <label class="row">
+      <span>Dicas</span>
+      <select id="hintMode"><option value="off">Desligadas</option><option value="cost">Com custo (vale rating)</option><option value="free">Ilimitadas (sem rating)</option></select>
+    </label>
+    <p id="hintNote" class="note"></p>
+    <label class="check"><input id="fullEngine" type="checkbox"> Motor completo para 3500+ (baixa ~95 MB; pesado em celular)</label>
+    <label class="check"><input id="ladder" type="checkbox"> Modo escada (adversário = seu rating + 100)</label>
+
+    <div class="buttons">
+      <button id="newW">Jogar de brancas</button>
+      <button id="newB">Jogar de pretas</button>
+      <button id="newR">Aleatório</button>
+    </div>
+    <div class="buttons">
+      <button id="posBtn">Posição específica…</button>
+      <button id="puzBtn">Puzzles (0)</button>
+    </div>
+    <div class="buttons">
+      <button id="resign" class="danger" disabled>Desistir</button>
+      <button id="flip">Girar tabuleiro</button>
+      <button id="resetRating" class="ghost">Zerar rating</button>
+    </div>
+    <p id="stats" class="note"></p>
+    <details><summary>Histórico de partidas</summary><div id="history"></div></details>
+  </section>
+</main>
+
+<div id="review" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>Revisão da partida</b><button id="rvClose" class="x">✕</button></div>
+  <div id="rvProg" class="note"></div>
+  <div id="rvSummary" class="summary"></div>
+  <svg id="rvChart" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
+  <div class="note">Gráfico: vantagem das brancas (alto) × pretas (baixo). Toque para pular; pontos = seus erros.</div>
+  <div id="rvBoard" class="board"></div>
+  <div id="rvInfo" class="status"></div>
+  <div class="buttons"><button id="rvFirst">⏮</button><button id="rvPrev">◀</button><button id="rvNext">▶</button><button id="rvLast">⏭</button></div>
+  <div class="buttons"><button id="rvNextErr">Próximo erro</button><button id="rvPlay">Jogar daqui</button></div>
+</div></div>
+
+<div id="puzzle" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>Puzzles das suas derrotas</b><button id="pzClose" class="x">✕</button></div>
+  <div id="pzCount" class="note"></div>
+  <div id="pzInfo" class="status"></div>
+  <div id="pzBoard" class="board"></div>
+  <div class="buttons under"><button id="pzHint">Dica</button><button id="pzSol">Ver solução</button><button id="pzNext">Próximo</button></div>
+</div></div>
+
+<div id="editor" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>Posição específica</b><button id="edClose" class="x">✕</button></div>
+  <select id="edPreset"><option value="">Posições prontas…</option></select>
+  <div id="edBoard" class="board"></div>
+  <div id="edPalette" class="palette"></div>
+  <label class="row"><span>Quem joga primeiro</span><select id="edTurn"><option value="w">Brancas</option><option value="b">Pretas</option></select></label>
+  <input id="edFen" class="fen" spellcheck="false" autocapitalize="off">
+  <div id="edMsg" class="status badtxt"></div>
+  <div class="buttons"><button id="edStd">Inicial</button><button id="edClear">Limpar</button><button id="edLoad">Carregar FEN</button></div>
+  <div class="buttons"><button id="edPlayW">Jogar de brancas</button><button id="edPlayB">Jogar de pretas</button></div>
+  <p class="note">Partidas a partir de posições personalizadas não valem rating.</p>
+</div></div>
+
+<div id="promo" class="promo" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
