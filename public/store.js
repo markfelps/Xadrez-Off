@@ -7,6 +7,9 @@ const DEFAULTS = {
   elo: 1500, games: [], puzzles: [], hintMode: 'off',
   orient: 'auto',            // auto = minha cor embaixo | w | b
   sqNames: false,            // nome da casa dentro de cada casa
+  playColor: 'w',            // cor do usuário na próxima partida: w | b | r
+  opening: null,             // abertura do computador: null | 'random' | { eco, name }
+  openInside: false,         // já começar dentro da abertura
   pcBoost: null,             // null = automático (ligado em PC, desligado em celular)
   confirmMove: false,        // pedir confirmação antes de jogar o lance
   consultSide: 'w', csTime: 1500, csPt: false, csBest: true,

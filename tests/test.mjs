@@ -138,3 +138,30 @@ console.log('todos os testes passaram');
   }
   console.log(`livro ok — ${BOOK_LINES.length} linhas, 300 partidas de teoria sem lance ilegal`);
 }
+
+// ---- catálogo de aberturas
+{
+  const O = await import('../public/openings.js');
+  const { Chess: C } = await import('../public/vendor/chess.js');
+  const { posKey } = await import('../public/posid.js');
+  if (O.openings().length < 3000) throw new Error('catálogo incompleto');
+  const t1 = O.search('gambito da dama recusado')[0];
+  if (!/^Queen's Gambit Declined/.test(t1.name)) throw new Error('busca PT: ' + t1.name);
+  if (!/^Sicilian Defense: Najdorf/.test(O.search('siciliana najdorf')[0].name)) throw new Error('busca siciliana');
+  if (O.search('B90')[0].eco !== 'B90') throw new Error('busca por ECO');
+  // repertório: o computador de pretas na Najdorf responde c5 d6 cxd4 Nf6 a6 nas posições da linha
+  const najd = O.search('sicilian najdorf')[0];
+  const rep = O.repertoire(najd, 'b');
+  const g = new C(); let hits = 0;
+  for (const san of najd.san) {
+    const u = rep.get(posKey(g.fen()));
+    const m = g.move(san);
+    if (g.turn() === 'w') { if (u !== m.from + m.to + (m.promotion || '')) throw new Error('repertório diverge em ' + san); hits++; }
+  }
+  if (hits !== 5) throw new Error('repertório: esperava 5 lances, deu ' + hits);
+  // transposição: a mesma posição por outra ordem de lances ainda é reconhecida
+  const tr = new C(); for (const s of 'd4 Nf6 c4 e6 Nc3 d5'.split(' ')) tr.move(s);
+  if (!O.identify(tr)) throw new Error('identify falhou');
+  for (let i = 0; i < 200; i++) { const o = O.randomOpening(); O.uciLine(o); }
+  console.log(`aberturas ok — ${O.openings().length} linhas, busca em português, repertório e identificação`);
+}

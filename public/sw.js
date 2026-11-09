@@ -1,8 +1,8 @@
 // Cache-first: após a primeira visita tudo funciona sem internet.
 // O motor completo (~95 MB) é guardado só quando for usado pela primeira vez.
-const CACHE = 'xadrez-offline-v8';
+const CACHE = 'xadrez-offline-v9';
 const CORE = [
-  './', 'index.html', 'style.css', 'app.js', 'logic.js', 'engine.js', 'store.js', 'notation.js', 'consult.js', 'util.js', 'board.js', 'review.js', 'puzzles.js', 'editor.js', 'book.js', 'vendor/chess.js',
+  './', 'index.html', 'style.css', 'app.js', 'logic.js', 'engine.js', 'store.js', 'notation.js', 'consult.js', 'util.js', 'board.js', 'review.js', 'puzzles.js', 'editor.js', 'book.js', 'openings.js', 'openings-data.js', 'openpicker.js', 'posid.js', 'vendor/chess.js',
   'engine/stockfish-19-lite-single.js', 'engine/stockfish-19-lite-single.wasm', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
 ];
 

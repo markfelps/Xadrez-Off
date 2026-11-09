@@ -123,3 +123,16 @@ textarea { width: 100%; background: #2c3140; color: var(--text); border: 0; bord
 [hidden] { display: none !important; }
 .palette { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .palette .pal { min-width: 0; padding: 6px 0; }
+
+.newgame { display: grid; gap: 10px; padding-top: 4px; border-top: 1px solid #2c3140; }
+.seg { display: flex; gap: 6px; }
+.seg button { padding: 12px 6px; }
+button.pick { text-align: left; display: grid; gap: 2px; background: #262a37; border: 1px solid #333949; }
+button.pick b { font-size: 15px; font-weight: 600; }
+button.big { padding: 16px; font-size: 17px; font-weight: 700; }
+.oplist { display: grid; gap: 6px; }
+button.op { text-align: left; display: grid; gap: 3px; background: #262a37; font-size: 14px; padding: 10px 12px; }
+button.op small { font-size: 12px; }
+button.op b { color: var(--accent); }
+.openNote { font-size: 13px; color: var(--muted); min-height: 18px; margin-bottom: 8px; }
+.openNote b { color: var(--text); font-weight: 600; }

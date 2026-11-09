@@ -33,6 +33,7 @@
   <div class="buttons under"><button id="undo" disabled>Voltar jogada</button><button id="liveEdit" disabled>Editar posição</button><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
   <div id="confirmBar" class="buttons under" hidden><button id="cfOk" class="accent">Confirmar lance</button><button id="cfNo">Cancelar</button></div>
   <div id="moves" class="moves"></div>
+  <div id="openNote" class="openNote"></div>
 
   <section class="panel">
     <label class="row">
@@ -68,10 +69,12 @@
     <label class="check"><input id="fullEngine" type="checkbox"> Motor completo para 3500+ (baixa ~95 MB; pesado em celular)</label>
     <label class="check"><input id="ladder" type="checkbox"> Modo escada (adversário = seu rating + 100)</label>
 
-    <div class="buttons">
-      <button id="newW">Jogar de brancas</button>
-      <button id="newB">Jogar de pretas</button>
-      <button id="newR">Aleatório</button>
+    <div class="newgame">
+      <div class="note">Você joga de</div>
+      <div id="colorSeg" class="seg"><button data-c="w">♔ Brancas</button><button data-c="b">♚ Pretas</button><button data-c="r">🎲 Aleatório</button></div>
+      <button id="openBtn" class="pick"><small>Abertura do computador</small><b id="openName">Livre</b></button>
+      <label class="check"><input id="openInside" type="checkbox"> Já começar dentro da abertura (joga os lances da linha)</label>
+      <button id="startBtn" class="accent big">Iniciar partida</button>
     </div>
     <div class="buttons">
       <button id="consBtn" class="accent">Consultor (Chess.com)</button>
@@ -129,6 +132,14 @@
   <div id="edLiveRow" class="buttons" hidden><button id="edApply" class="accent">Aplicar e continuar a partida</button></div>
   <p class="note">Arraste as peças (da paleta ou do tabuleiro). Soltar fora do tabuleiro apaga. Ou toque numa peça e depois na casa de destino.</p>
   <p class="note">Partidas a partir de posições personalizadas não valem rating.</p>
+</div></div>
+
+<div id="openPicker" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>Abertura do computador</b><button id="opClose" class="x">✕</button></div>
+  <div class="buttons"><button id="opFree">Livre (sem abertura)</button><button id="opRandom">🎲 Aleatória</button></div>
+  <input id="opQ" class="fen" placeholder="Buscar: siciliana, najdorf, B90, londres…" autocomplete="off" spellcheck="false">
+  <div id="opCount" class="note"></div>
+  <div id="opList" class="oplist"></div>
 </div></div>
 
 <div id="consult" class="overlay" hidden><div class="inner">

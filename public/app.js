@@ -1,6 +1,9 @@
 import { Chess } from './vendor/chess.js';
 import { getEngine, stopAll, engineLoaded, loadProgress, setBoost } from './engine.js';
 import { bookMove } from './book.js';
+import { openings, randomOpening, repertoire, identify } from './openings.js';
+import { posKey } from './posid.js';
+import { openPicker } from './openpicker.js';
 import {
   ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent,
   HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime,
@@ -27,6 +30,7 @@ let thinking = false, active = false, gameId = 0, gameElo = elo;
 let startFen = null;            // null = posição inicial padrão
 let hintCost = 0, undoCost = 0, hintMv = null, hintMarks = {}, pending = null;
 let lastGame = null;
+let openRep = null, openChosen = null; // abertura escolhida para o computador: repertório (posição→lance) e a abertura
 
 // ---------- relógio ----------
 const clock = { on: false, w: 0, b: 0, incMs: 0, minMs: 0, engMs: 0, running: null, last: 0 };
@@ -183,6 +187,7 @@ function render() {
     white = !white;
   });
   $('moves').textContent = txt;
+  renderOpenNote();
   $('moves').scrollTop = 1e6;
   updateControls();
   drawClock();
@@ -199,6 +204,20 @@ function tryMove(m) {
   setStatus('Confirmar ' + chess.move({ ...m, promotion: m.promotion || 'q' }).san + '?');
   chess.undo();
   render();
+}
+
+function renderOpenNote() {
+  const el = $('openNote');
+  const cur = !startFen && chess.history().length ? identify(chess) : null;
+  const parts = [];
+  if (cur) parts.push(`📖 <b></b> (${cur.eco})`);
+  el.innerHTML = parts.join('');
+  if (cur) el.querySelector('b').textContent = cur.name;
+  if (active && openChosen) {
+    const s = document.createElement('div');
+    s.textContent = `Abertura do computador: ${openChosen.name}`;
+    el.appendChild(s);
+  }
 }
 
 function onSquare(name) {
@@ -251,7 +270,9 @@ async function engineTurn() {
   if (plan.engine === 'full' && !$('fullEngine').checked) { plan.engine = 'lite'; plan.movetime = Math.round(plan.movetime * 1.5); }
   let uci, eng = null, book = null;
   try {
-    book = boost() && !startFen && gameElo >= 2000 ? bookMove(uciHistory()) : null;
+    const chosen = openRep && !startFen ? openRep.get(posKey(chess.fen())) : null;
+    book = chosen ? { uci: chosen, name: openChosen.name, chosen: true }
+      : boost() && !startFen && gameElo >= 2000 ? bookMove(uciHistory()) : null;
     if (book) {
       // dentro da teoria: joga o lance do livro (com uma pequena pausa para parecer natural)
       clockStart(engColor);
@@ -288,7 +309,7 @@ async function engineTurn() {
   render();
   if (!checkEnd()) {
     clockStart(myColor);
-    setStatus((chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.') + (book ? ` (teoria${book.name ? ': ' + book.name : ''})` : ''));
+    setStatus((chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.') + (book ? (book.chosen ? ' (abertura escolhida)' : ` (teoria${book.name ? ': ' + book.name : ''})`) : ''));
     // ponder: continua pensando, na posição prevista, enquanto você joga
     if (boost() && eng && !book && !plan.limit) eng.startPonder(plan, uciHistory(), startFen, eng.lastPonder);
   }
@@ -338,7 +359,7 @@ function finish(score, msg) {
 
 const setStatus = (t) => { $('status').textContent = t; };
 
-function newGame(color, fen = null, oppElo = null) {
+function newGame(color, fen = null, oppElo = null, openingSel = null) {
   stopAll();
   gameId++;
   clockStop();
@@ -349,6 +370,12 @@ function newGame(color, fen = null, oppElo = null) {
   myColor = color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
   flipped = orientFlipped(myColor);
   gameElo = elo;
+  openRep = null; openChosen = null;
+  if (openingSel && !fen) {
+    openChosen = openingSel === 'random' ? randomOpening() : openingSel;
+    openRep = repertoire(openChosen, opp(myColor));
+    if (S.openInside) for (const s of openChosen.san) chess.move(s); // joga os lances da linha dos dois lados
+  }
   active = true; thinking = false; selected = null; legal = [];
   hintCost = 0; undoCost = 0; hintMarks = {}; hintMv = null; clearPending();
   const cfg = clockConfig(S.clock.preset, S.clock);
@@ -361,6 +388,7 @@ function newGame(color, fen = null, oppElo = null) {
   renderLevel();
   render();
   setStatus((fen ? 'Posição personalizada (sem rating). ' : '') + (c.turn() === myColor ? 'Sua vez.' : 'Computador começa.'));
+  renderOpenNote();
   if (c.turn() === myColor) clockStart(myColor);
   engineTurn();
 }
@@ -476,9 +504,23 @@ function review(g) {
 }
 
 // ---------- botões ----------
-$('newW').onclick = () => newGame('w');
-$('newB').onclick = () => newGame('b');
-$('newR').onclick = () => newGame('r');
+// ---------- nova partida: cor, abertura do computador e botão Iniciar ----------
+const openingFromSel = () => {
+  if (S.opening === 'random') return 'random';
+  if (S.opening && S.opening.name) return openings().find((o) => o.name === S.opening.name && o.eco === S.opening.eco) || null;
+  return null;
+};
+function drawNewGameUi() {
+  document.querySelectorAll('#colorSeg button').forEach((b) => b.classList.toggle('on', b.dataset.c === S.playColor));
+  $('openName').textContent = S.opening === 'random' ? '🎲 Aleatória' : S.opening && S.opening.name ? `${S.opening.eco} · ${S.opening.name}` : 'Livre (sem abertura)';
+  $('openInside').checked = !!S.openInside;
+  $('openInside').closest('label').hidden = !S.opening;
+}
+document.querySelectorAll('#colorSeg button').forEach((b) => { b.onclick = () => { S.playColor = b.dataset.c; save(); drawNewGameUi(); }; });
+$('openBtn').onclick = () => openPicker({ onPick: (v) => { S.opening = v === 'random' ? 'random' : v ? { eco: v.eco, name: v.name } : null; save(); drawNewGameUi(); } });
+$('openInside').onchange = () => { S.openInside = $('openInside').checked; save(); };
+$('startBtn').onclick = () => newGame(S.playColor, null, null, openingFromSel());
+drawNewGameUi();
 $('flip').onclick = () => { flipped = !flipped; render(); };
 $('resign').onclick = () => { if (active && confirm('Desistir da partida?')) { gameId++; thinking = false; stopAll(); finish(0, 'Você desistiu.'); } };
 $('resetRating').onclick = () => { if (confirm('Zerar rating?')) { player = Object.assign(player, { rating: 1200, games: 0, peak: 1200, wins: 0, draws: 0, losses: 0 }); S.player = player; save(); renderLevel(); } };
