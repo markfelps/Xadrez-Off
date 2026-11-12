@@ -165,3 +165,8 @@ export function engineMovetime(planMs, remainingMs, incMs = 0) {
   if (remainingMs == null) return planMs;
   return Math.max(50, Math.min(planMs, Math.round(remainingMs * 0.05 + incMs * 0.7)));
 }
+
+// nível médio do computador numa partida em que o nível mudou (média dos níveis usados em cada lance dele)
+export function meanLevel(levels, fallback) {
+  return levels.length ? Math.round(levels.reduce((s, v) => s + v, 0) / levels.length) : fallback;
+}

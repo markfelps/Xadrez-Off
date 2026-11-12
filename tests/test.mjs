@@ -165,3 +165,11 @@ console.log('todos os testes passaram');
   for (let i = 0; i < 200; i++) { const o = O.randomOpening(); O.uciLine(o); }
   console.log(`aberturas ok — ${O.openings().length} linhas, busca em português, repertório e identificação`);
 }
+
+// ---- nível médio quando o nível muda durante a partida
+{
+  const { meanLevel } = await import('../public/logic.js');
+  if (meanLevel([1500, 1500, 1750, 1750], 0) !== 1625) throw new Error('meanLevel');
+  if (meanLevel([], 1800) !== 1800) throw new Error('meanLevel vazio');
+  console.log('nível médio ok');
+}

@@ -5,7 +5,7 @@ import { openings, randomOpening, repertoire, identify } from './openings.js';
 import { posKey } from './posid.js';
 import { openPicker } from './openpicker.js';
 import {
-  ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent,
+  ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent, meanLevel,
   HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime,
 } from './logic.js';
 import { drawBoard, kingSquare, boardPrefs } from './board.js';
@@ -27,6 +27,7 @@ let elo = Math.max(ELO_MIN, Math.min(ELO_MAX, S.elo));
 let chess = new Chess();
 let myColor = 'w', flipped = false, selected = null, legal = [];
 let thinking = false, active = false, gameId = 0, gameElo = elo;
+let levelLog = [];            // nível usado em cada lance do computador (para o rating quando o nível muda no meio da partida)
 let startFen = null;            // null = posição inicial padrão
 let hintCost = 0, undoCost = 0, hintMv = null, hintMarks = {}, pending = null;
 let lastGame = null;
@@ -113,6 +114,10 @@ function setElo(v) {
   elo = Math.max(ELO_MIN, Math.min(ELO_MAX, v));
   $('eloSlider').value = elo;
   S.elo = elo; save();
+  if (active && gameElo !== elo) {
+    gameElo = elo; // vale a partir do próximo lance do computador
+    if (!thinking) setStatus($('status').textContent.replace(/ \[nível.*\]$/, '') + ` [nível ${elo}]`);
+  }
   renderLevel();
   warm();
 }
@@ -120,6 +125,8 @@ function renderLevel() {
   $('eloLabel').textContent = elo;
   $('eloName').textContent = '— ' + levelName(elo);
   $('oppRating').textContent = active ? gameElo : elo;
+  $('lvlNow').textContent = elo;
+  if (active) $('oppName').textContent = `Computador · ${levelName(gameElo)}`;
   $('myRating').textContent = player.rating;
   const p = enginePlan(elo);
   $('eloNote').textContent =
@@ -133,6 +140,7 @@ function renderLevel() {
   renderHistory();
 }
 $('eloSlider').oninput = (e) => { $('ladder').checked = false; setElo(+e.target.value); };
+document.querySelectorAll('.liveLevel button').forEach((b) => { b.onclick = () => { $('ladder').checked = false; setElo(elo + +b.dataset.d); }; });
 $('ladder').onchange = () => { if ($('ladder').checked) setElo(ladderOpponent(player.rating)); };
 
 // ---------- motor: pré-carga, progresso e fallback ----------
@@ -267,6 +275,7 @@ async function engineTurn() {
   setStatus('Computador pensando…');
   updateControls();
   const plan = enginePlan(gameElo);
+  const moveElo = gameElo; // nível deste lance (o usuário pode mudar o nível enquanto o computador pensa)
   if (plan.engine === 'full' && !$('fullEngine').checked) { plan.engine = 'lite'; plan.movetime = Math.round(plan.movetime * 1.5); }
   let uci, eng = null, book = null;
   try {
@@ -306,6 +315,7 @@ async function engineTurn() {
   clockStop();
   if (clock.on) clock[engColor] += clock.incMs;
   chess.move(parse(uci));
+  levelLog.push(moveElo);
   render();
   if (!checkEnd()) {
     clockStart(myColor);
@@ -333,21 +343,23 @@ function finish(score, msg) {
   active = false;
   $('resign').disabled = true;
   const rated = isRated();
+  const oppAvg = meanLevel(levelLog, gameElo); // se o nível mudou durante a partida, vale a média dos lances do computador
+  const mixed = levelLog.some((v) => v !== levelLog[0]);
   let d = 0;
   if (rated) {
     const before = player.rating;
     const oldPeak = player.peak;
-    player = updateRating(player, gameElo, score);
+    player = updateRating(player, oppAvg, score);
     player.rating = Math.max(100, player.rating - penalty());
     player.peak = Math.max(oldPeak, player.rating);
     d = player.rating - before;
     S.player = player;
   }
-  lastGame = { id: Date.now(), date: new Date().toISOString(), startFen, moves: uciHistory(), color: myColor, oppElo: gameElo, score, rated, hintCost, undoCost };
+  lastGame = { id: Date.now(), date: new Date().toISOString(), startFen, moves: uciHistory(), color: myColor, oppElo: oppAvg, score, rated, hintCost, undoCost };
   S.games.push(lastGame);
   save();
   const why = startFen ? 'posição personalizada' : timeOdds() ? 'tempo diferente' : 'dicas ilimitadas';
-  setStatus(msg + (rated ? '' : ` (sem rating: ${why})`));
+  setStatus(msg + (rated ? '' : ` (sem rating: ${why})`) + (mixed ? ` Nível médio do computador: ${oppAvg}.` : ''));
   const el = $('lastDelta');
   el.textContent = rated ? (d >= 0 ? '+' : '') + d + (penalty() ? ` (extras −${penalty()})` : '') : 'treino';
   el.className = 'delta ' + (d >= 0 ? 'up' : 'down');
@@ -369,7 +381,7 @@ function newGame(color, fen = null, oppElo = null, openingSel = null) {
   chess = c; startFen = fen;
   myColor = color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
   flipped = orientFlipped(myColor);
-  gameElo = elo;
+  gameElo = elo; levelLog = [];
   openRep = null; openChosen = null;
   if (openingSel && !fen) {
     openChosen = openingSel === 'random' ? randomOpening() : openingSel;
@@ -405,6 +417,7 @@ function undoMove() {
   } else if (chess.turn() === myColor) {
     stopAll();
     chess.undo(); chess.undo();
+    levelLog.pop();
   } else return;
   if (isRated()) undoCost += UNDO_COST;
   clearPending();
