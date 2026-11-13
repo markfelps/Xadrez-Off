@@ -173,3 +173,31 @@ console.log('todos os testes passaram');
   if (meanLevel([], 1800) !== 1800) throw new Error('meanLevel vazio');
   console.log('nível médio ok');
 }
+
+// ---- modo humano
+{
+  const H = await import('../public/human.js');
+  const { Chess: C } = await import('../public/vendor/chess.js');
+  let prev = 1e9;
+  for (const e of [600, 1000, 1400, 1800, 2200, 2600]) {
+    const p = H.humanParams(e);
+    if (p.temp > prev) throw new Error('temperatura deveria cair com o nível');
+    prev = p.temp;
+  }
+  if (H.humanParams(600).depth >= H.humanParams(2400).depth) throw new Error('profundidade deveria crescer');
+  const g = new C();
+  const legal = g.moves({ verbose: true }).map((m) => m.from + m.to);
+  const cands = [{ uci: 'e2e4', cp: 30 }, { uci: 'd2d4', cp: 25 }, { uci: 'g1f3', cp: 20 }, { uci: 'a2a3', cp: -40 }];
+  const counts = {};
+  for (let i = 0; i < 600; i++) { const r = H.chooseHuman(cands, g, H.humanParams(1000)); if (!legal.includes(r.uci)) throw new Error('lance ilegal'); counts[r.uci] = (counts[r.uci] || 0) + 1; }
+  if (Object.keys(counts).length < 3) throw new Error('modo humano deveria variar os lances');
+  // um nível alto quase sempre joga o melhor
+  let top = 0; for (let i = 0; i < 400; i++) if (H.chooseHuman(cands, g, H.humanParams(2600)).uci === 'e2e4') top++;
+  if (top < 140) throw new Error('nível alto deveria preferir o melhor lance');
+  if (H.shouldResign([-950, -1000, -990], H.humanParams(1600)) !== true) throw new Error('deveria desistir');
+  if (H.shouldResign([-950, -200, -990], H.humanParams(1600))) throw new Error('não deveria desistir');
+  if (H.shouldResign([-2000, -2000, -2000], H.humanParams(2800))) throw new Error('mestre não desiste');
+  const d = H.humanDelay(cands, g, H.humanParams(1200), null, () => 0.5);
+  if (!(d > 300 && d <= 4500)) throw new Error('atraso fora do esperado');
+  console.log('modo humano ok');
+}

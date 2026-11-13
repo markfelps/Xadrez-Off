@@ -10,6 +10,7 @@ const DEFAULTS = {
   playColor: 'w',            // cor do usuário na próxima partida: w | b | r
   opening: null,             // abertura do computador: null | 'random' | { eco, name }
   openInside: false,         // já começar dentro da abertura
+  human: false,              // modo humano: o computador joga como uma pessoa (abaixo de 2850)
   pcBoost: null,             // null = automático (ligado em PC, desligado em celular)
   confirmMove: false,        // pedir confirmação antes de jogar o lance
   consultSide: 'w', csTime: 1500, csPt: false, csBest: true,

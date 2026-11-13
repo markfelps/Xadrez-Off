@@ -175,6 +175,32 @@ class UciEngine {
     });
   }
 
+  // candidatos para o modo humano: busca com profundidade limitada e várias linhas (MultiPV)
+  // devolve [{ uci, cp }] ordenado; cp é do ponto de vista de quem joga
+  candidates(moves, startFen, { depth, multipv = 6, movetime = 2500 }) {
+    this._cancelPonder();
+    return this.run(async () => {
+      await this.ready;
+      this.send('setoption name UCI_LimitStrength value false');
+      this.send(`setoption name MultiPV value ${multipv}`);
+      await this.isReady();
+      this.send((startFen ? `position fen ${startFen}` : 'position startpos') + (moves.length ? ' moves ' + moves.join(' ') : ''));
+      const byK = new Map();
+      const fn = (line) => {
+        if (line === null || !line.startsWith('info') || /bound/.test(line)) return;
+        const sc = line.match(/score (cp|mate) (-?\d+)/), pv = line.match(/ pv (\S+)/), mp = line.match(/multipv (\d+)/), dp = line.match(/ depth (\d+)/);
+        if (!sc || !pv) return;
+        byK.set(mp ? +mp[1] : 1, { uci: pv[1], cp: scoreToCp(sc[1], +sc[2]), depth: dp ? +dp[1] : 0 });
+      };
+      this.listeners.add(fn);
+      this.searching = 'game';
+      const done = this._waitFor(/^bestmove (\S+)/, movetime + 30000);
+      this.send(`go depth ${depth} movetime ${movetime}`);
+      try { await done; } finally { this.listeners.delete(fn); this.searching = null; this.send('setoption name MultiPV value 1'); }
+      return [...byK.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+    });
+  }
+
   // interrompe só buscas de análise (nunca a jogada do computador numa partida)
   stopAnalysis() { if (this.searching === 'analysis') this.send('stop'); }
 

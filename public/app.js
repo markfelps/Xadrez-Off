@@ -1,6 +1,7 @@
 import { Chess } from './vendor/chess.js';
 import { getEngine, stopAll, engineLoaded, loadProgress, setBoost } from './engine.js';
 import { bookMove } from './book.js';
+import { HUMAN_MAX, humanParams, chooseHuman, humanDelay, shouldResign } from './human.js';
 import { openings, randomOpening, repertoire, identify } from './openings.js';
 import { posKey } from './posid.js';
 import { openPicker } from './openpicker.js';
@@ -27,6 +28,7 @@ let elo = Math.max(ELO_MIN, Math.min(ELO_MAX, S.elo));
 let chess = new Chess();
 let myColor = 'w', flipped = false, selected = null, legal = [];
 let thinking = false, active = false, gameId = 0, gameElo = elo;
+let humanBookOver = false, evalLog = [];   // modo humano: saiu do livro? avaliações do computador (para desistir)
 let levelLog = [];            // nível usado em cada lance do computador (para o rating quando o nível muda no meio da partida)
 let startFen = null;            // null = posição inicial padrão
 let hintCost = 0, undoCost = 0, hintMv = null, hintMarks = {}, pending = null;
@@ -126,11 +128,13 @@ function renderLevel() {
   $('eloName').textContent = '— ' + levelName(elo);
   $('oppRating').textContent = active ? gameElo : elo;
   $('lvlNow').textContent = elo;
-  if (active) $('oppName').textContent = `Computador · ${levelName(gameElo)}`;
+  if (active) $('oppName').textContent = `Computador · ${levelName(gameElo)}${S.human && gameElo < HUMAN_MAX ? ' (humano)' : ''}`;
   $('myRating').textContent = player.rating;
   const p = enginePlan(elo);
-  $('eloNote').textContent =
-    elo > SF_MAX_ELO
+  const hp = S.human && elo < HUMAN_MAX ? humanParams(elo) : null;
+  $('eloNote').textContent = hp
+    ? `Modo humano: o computador olha ${hp.depth} lance(s) à frente, escolhe entre os melhores candidatos (com preferência por capturas, xeques e recapturas), às vezes descuida e pode desistir se a posição estiver perdida.`
+    : elo > SF_MAX_ELO
       ? `Acima de ${SF_MAX_ELO} o motor joga sem limite de força, pensando até ${(p.movetime / 1000).toFixed(1)}s por lance${p.engine === 'full' ? ' (rede neural completa)' : ''}. 3650 é a força estimada do Stockfish completo; esses números são nominais.`
       : elo < 1320
         ? `Stockfish a 1320 com ~${Math.round(p.randomP * 100)}% de lances aleatórios.`
@@ -279,14 +283,42 @@ async function engineTurn() {
   if (plan.engine === 'full' && !$('fullEngine').checked) { plan.engine = 'lite'; plan.movetime = Math.round(plan.movetime * 1.5); }
   let uci, eng = null, book = null;
   try {
+    const human = !!S.human && moveElo < HUMAN_MAX;
     const chosen = openRep && !startFen ? openRep.get(posKey(chess.fen())) : null;
+    // modo humano: usa o livro por um tempo e, a cada lance, tem chance de "esquecer a teoria" (mais cedo quanto mais fraco)
+    let useBook = boost() && !startFen && gameElo >= 2000;
+    if (human) {
+      useBook = !startFen && !humanBookOver && moveElo >= 900;
+      if (useBook && Math.random() > Math.min(0.95, Math.max(0.2, (moveElo - 700) / 1500))) { useBook = false; humanBookOver = true; }
+    }
     book = chosen ? { uci: chosen, name: openChosen.name, chosen: true }
-      : boost() && !startFen && gameElo >= 2000 ? bookMove(uciHistory()) : null;
+      : useBook ? bookMove(uciHistory()) : null;
+    if (human && !book && !chosen) humanBookOver = humanBookOver || chess.history().length >= 2;
     if (book) {
       // dentro da teoria: joga o lance do livro (com uma pequena pausa para parecer natural)
       clockStart(engColor);
       await new Promise((r) => setTimeout(r, 400 + Math.random() * 700));
       uci = book.uci;
+    } else if (human) {
+      eng = await ensureEngine('lite');
+      if (id !== gameId) return;
+      const prm = humanParams(moveElo);
+      clockStart(engColor);
+      const t0 = Date.now();
+      const cands = await eng.candidates(uciHistory(), startFen, { depth: prm.depth, multipv: prm.multipv, movetime: 2500 });
+      if (id !== gameId) return;
+      if (!cands.length) throw new Error('o motor não devolveu lances');
+      evalLog.push(cands[0].cp);
+      if (chess.history().length >= 24 && shouldResign(evalLog, prm)) {
+        thinking = false; clockStop();
+        finish(1, 'O computador desistiu — posição perdida. Você venceu!');
+        return;
+      }
+      const pick = chooseHuman(cands, chess, prm);
+      const wait = humanDelay(cands, chess, prm, clock.on ? clock[engColor] : null) - (Date.now() - t0);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      if (id !== gameId) return;
+      uci = pick.uci;
     } else if (plan.randomP && Math.random() < plan.randomP) {
       const all = chess.moves({ verbose: true });
       const m = all[Math.floor(Math.random() * all.length)];
@@ -321,7 +353,7 @@ async function engineTurn() {
     clockStart(myColor);
     setStatus((chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.') + (book ? (book.chosen ? ' (abertura escolhida)' : ` (teoria${book.name ? ': ' + book.name : ''})`) : ''));
     // ponder: continua pensando, na posição prevista, enquanto você joga
-    if (boost() && eng && !book && !plan.limit) eng.startPonder(plan, uciHistory(), startFen, eng.lastPonder);
+    if (boost() && eng && !book && !plan.limit && !(S.human && moveElo < HUMAN_MAX)) eng.startPonder(plan, uciHistory(), startFen, eng.lastPonder);
   }
 }
 
@@ -381,7 +413,7 @@ function newGame(color, fen = null, oppElo = null, openingSel = null) {
   chess = c; startFen = fen;
   myColor = color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
   flipped = orientFlipped(myColor);
-  gameElo = elo; levelLog = [];
+  gameElo = elo; levelLog = []; humanBookOver = false; evalLog = [];
   openRep = null; openChosen = null;
   if (openingSel && !fen) {
     openChosen = openingSel === 'random' ? randomOpening() : openingSel;
@@ -542,6 +574,8 @@ $('undo').onclick = undoMove;
 $('liveEdit').onclick = liveEdit;
 $('cfOk').onclick = () => { if (pending && active && !thinking) playMove(pending); };
 $('cfNo').onclick = () => { clearPending(); selected = null; legal = []; setStatus('Sua vez.'); render(); };
+$('humanMode').checked = !!S.human;
+$('humanMode').onchange = () => { S.human = $('humanMode').checked; save(); renderLevel(); };
 $('pcBoost').checked = boost();
 $('pcBoost').onchange = () => { S.pcBoost = $('pcBoost').checked; save(); setBoost(S.pcBoost); if (!S.pcBoost) stopAll(); };
 setBoost(boost());
