@@ -37,7 +37,8 @@ export function drawBoard(el, grid, o = {}) {
       if (o.last && (o.last[0] === name || o.last[1] === name)) d.classList.add('last');
       if (o.sel === name) d.classList.add('sel');
       if (o.check === name) d.classList.add('check');
-      if (o.marks && o.marks[name]) d.classList.add(o.marks[name]);
+      if (o.marks && o.marks[name]) d.classList.add(...o.marks[name].split(' '));
+      if (o.badges && o.badges[name]) { d.classList.add('mk-' + o.badges[name].cls); d.dataset.mk = o.badges[name].sym; }
       const lm = o.legal && o.legal.find((m) => m.to === name);
       if (lm) { d.classList.add('hint'); if (lm.captured || (lm.flags && lm.flags.includes('e'))) d.classList.add('cap'); }
       const p = grid[r][f];
@@ -56,4 +57,25 @@ export function drawBoard(el, grid, o = {}) {
 
 export function kingSquare(chess, color) {
   for (const row of chess.board()) for (const p of row) if (p && p.type === 'k' && p.color === color) return p.square;
+}
+
+// seta de uma casa a outra sobre o tabuleiro (SVG em escala 8x8)
+export function drawArrow(el, from, to, { flipped = false, color = '#4caf50', opacity = 0.85 } = {}) {
+  el.querySelectorAll('svg.arrows').forEach((n) => n.remove());
+  if (!from || !to) return;
+  const pos = (sq) => {
+    const f = FILES.indexOf(sq[0]), r = 8 - +sq[1];
+    return [(flipped ? 7 - f : f) + 0.5, (flipped ? 7 - r : r) + 0.5];
+  };
+  const [x1, y1] = pos(from), [x2, y2] = pos(to);
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, head = 0.42, w = 0.16;
+  const ex = x2 - ux * head, ey = y2 - uy * head;
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 8 8'); svg.setAttribute('class', 'arrows');
+  svg.innerHTML = `<g opacity="${opacity}" fill="${color}" stroke="${color}">` +
+    `<line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke-width="${w * 2}" stroke-linecap="round"/>` +
+    `<polygon points="${x2},${y2} ${ex - uy * 0.3},${ey + ux * 0.3} ${ex + uy * 0.3},${ey - ux * 0.3}" stroke="none"/></g>`;
+  el.appendChild(svg);
 }

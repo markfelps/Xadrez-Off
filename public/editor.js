@@ -1,4 +1,5 @@
 import { Chess } from './vendor/chess.js';
+import { startDrag as drag } from './drag.js';
 import { drawBoard, GLYPH } from './board.js';
 import { PRESET_POSITIONS, STANDARD_FEN } from './logic.js';
 import { orientFlipped } from './store.js';
@@ -58,46 +59,6 @@ function render() {
   $('edMsg').textContent = '';
 }
 
-// arrasto com o dedo/mouse: peça da paleta ou do tabuleiro -> casa; soltar fora do tabuleiro remove
-function startDrag(e, piece, { onDrop, onTap, srcSq }) {
-  e.preventDefault();
-  const sx = e.clientX, sy = e.clientY;
-  let g = null, moved = false;
-  const size = Math.round($('edBoard').clientWidth / 8 * 1.25);
-  const hot = (sq) => {
-    $('edBoard').querySelectorAll('.sq.over').forEach((n) => n.classList.remove('over'));
-    if (sq) { const n = $('edBoard').querySelector(`[data-sq=${sq}]`); if (n) n.classList.add('over'); }
-  };
-  const mv = (ev) => {
-    if (!moved) {
-      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) return;
-      moved = true;
-      g = document.createElement('div');
-      g.className = 'dragghost pc ' + piece.color;
-      g.style.fontSize = size + 'px';
-      g.textContent = GLYPH[piece.type];
-      document.body.appendChild(g);
-      if (srcSq) { const n = $('edBoard').querySelector(`[data-sq=${srcSq}] .pc`); if (n) n.style.opacity = '.25'; }
-    }
-    g.style.left = ev.clientX + 'px'; g.style.top = ev.clientY + 'px';
-    hot(sqAt(ev.clientX, ev.clientY));
-  };
-  const end = (ev, ok) => {
-    window.removeEventListener('pointermove', mv);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', cancel);
-    if (g) g.remove();
-    hot(null);
-    if (!ok) return render();
-    if (moved) onDrop(sqAt(ev.clientX, ev.clientY)); else onTap();
-  };
-  const up = (ev) => end(ev, true);
-  const cancel = (ev) => end(ev, false);
-  window.addEventListener('pointermove', mv);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', cancel);
-}
-
 const setSq = (sq, p) => { const [r, f] = idx(sq); grid[r][f] = p; };
 const getSq = (sq) => { const [r, f] = idx(sq); return grid[r][f]; };
 
@@ -116,7 +77,8 @@ function onBoardDown(e) {
   if (!s) return;
   const sq = s.dataset.sq, p = getSq(sq);
   if (!p) return tap(sq);
-  startDrag(e, p, {
+  drag(e, p, {
+    boardEl: $('edBoard'), onCancel: render,
     srcSq: sq,
     onTap: () => tap(sq),
     onDrop: (to) => {
@@ -144,7 +106,8 @@ export function openEditor({ onPlay, fen = null, flipped: fl = null, live: isLiv
     for (const col of ['w', 'b']) for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
       const b = document.createElement('button');
       b.className = 'pal ' + col; b.dataset.t = col + t; b.textContent = GLYPH[t];
-      b.onpointerdown = (e) => startDrag(e, { color: col, type: t }, {
+      b.onpointerdown = (e) => drag(e, { color: col, type: t }, {
+        boardEl: $('edBoard'), onCancel: render,
         onTap: () => { tool = col + t; sel = null; mark(); render(); },
         onDrop: (to) => { if (to) setSq(to, { color: col, type: t }); sel = null; render(); },
       });

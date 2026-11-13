@@ -170,3 +170,76 @@ export function engineMovetime(planMs, remainingMs, incMs = 0) {
 export function meanLevel(levels, fallback) {
   return levels.length ? Math.round(levels.reduce((s, v) => s + v, 0) / levels.length) : fallback;
 }
+
+// ---------- classificação de lances estilo Chess.com ----------
+export const MOVE_CLASSES = ['brilliant', 'great', 'best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'miss', 'blunder'];
+export const MOVE_LABEL = {
+  brilliant: 'Brilhante', great: 'Ótimo', best: 'Melhor', excellent: 'Excelente', good: 'Bom', book: 'Teoria',
+  inaccuracy: 'Imprecisão', mistake: 'Erro', miss: 'Chance perdida', blunder: 'Erro grave',
+};
+export const MOVE_SYMBOL = { brilliant: '!!', great: '!', best: '★', excellent: '✓', good: '✓', book: '📖', inaccuracy: '?!', mistake: '?', miss: '✕', blunder: '??' };
+export const BAD_CLASSES = ['inaccuracy', 'mistake', 'miss', 'blunder'];
+
+// m: { loss, wpBefore, wpAfter }; ctx: { isBest, isBook, sacrifice, gap (win% entre o 1º e o 2º melhor), prevOppLoss }
+export function classifyMove(m, ctx = {}) {
+  const { loss, wpBefore, wpAfter } = m;
+  if (ctx.sacrifice && (ctx.isBest || loss <= 1) && loss <= 2 && wpBefore <= 80 && wpAfter >= 40) return 'brilliant';
+  if (ctx.isBook && loss < 10) return 'book';
+  if (ctx.isBest && ctx.gap != null && ctx.gap >= 15 && wpBefore >= 20 && wpBefore <= 85) return 'great';
+  if (ctx.isBest || loss < 0.8) return 'best';
+  if (loss < 2.5) return 'excellent';
+  if (loss < 5) return 'good';
+  if ((ctx.prevOppLoss || 0) >= 12 && loss >= 8 && wpBefore >= 60) return 'miss';
+  if (loss < 10) return 'inaccuracy';
+  if (loss < 20) return 'mistake';
+  return 'blunder';
+}
+
+// fase da partida: abertura (primeiros 10 lances de cada lado), final (pouco material pesado) ou meio-jogo
+const PIECE_VAL = { q: 9, r: 5, b: 3, n: 3 };
+export function heavyMaterial(fen) {
+  let t = 0;
+  for (const ch of fen.split(' ')[0]) { const v = PIECE_VAL[ch.toLowerCase()]; if (v) t += v; }
+  return t;
+}
+export function phaseOf(ply, fen) {
+  if (ply < 20) return 'opening';
+  return heavyMaterial(fen) <= 26 ? 'endgame' : 'middlegame';
+}
+export const PHASE_LABEL = { opening: 'Abertura', middlegame: 'Meio-jogo', endgame: 'Final' };
+
+// saldo de material (peões inclusos) do ponto de vista de `color`
+const MAT = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+export function materialBalance(fen, color) {
+  let s = 0;
+  for (const ch of fen.split(' ')[0]) {
+    const v = MAT[ch.toLowerCase()];
+    if (!v) continue;
+    const white = ch === ch.toUpperCase();
+    s += (white === (color === 'w') ? 1 : -1) * v;
+  }
+  return s;
+}
+
+// ---------- handicap de material ----------
+export const HANDICAPS = [
+  { id: 'none', label: 'Sem handicap' },
+  { id: 'p', label: 'sem um peão (f)', pts: 1 },
+  { id: 'n', label: 'sem um cavalo', pts: 3 },
+  { id: 'b', label: 'sem um bispo', pts: 3 },
+  { id: 'r', label: 'sem uma torre', pts: 5 },
+  { id: 'q', label: 'sem a dama', pts: 9 },
+];
+// posição inicial sem uma peça de `side` ('w'|'b'); tira também o direito de roque se a torre sumir
+export function handicapFen(side, piece) {
+  const rows = ['rnbqkbnr', 'pppppppp', '8', '8', '8', '8', 'PPPPPPPP', 'RNBQKBNR'];
+  const idx = side === 'w' ? 7 : 0, pr = side === 'w' ? 6 : 1;
+  const set = (i, f, ch) => { const a = []; for (const c of rows[i].replace(/\d/g, (d) => '1'.repeat(+d))) a.push(c); a[f] = ch; rows[i] = a.join('').replace(/1+/g, (m) => m.length); };
+  let castle = 'KQkq';
+  if (piece === 'q') set(idx, 3, '1');
+  else if (piece === 'r') { set(idx, 0, '1'); castle = castle.replace(side === 'w' ? 'Q' : 'q', ''); }
+  else if (piece === 'b') set(idx, 5, '1');
+  else if (piece === 'n') set(idx, 1, '1');
+  else if (piece === 'p') set(pr, 5, '1');
+  return `${rows.join('/')} w ${castle || '-'} - 0 1`;
+}

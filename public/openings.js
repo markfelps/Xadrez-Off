@@ -109,3 +109,9 @@ export function identify(chess) {
   for (let i = ids.length - 1; i >= 1; i--) { const o = index.get(ids[i]); if (o) return o; }
   return null;
 }
+
+// a posição aparece no catálogo de aberturas? (teoria)
+export function inCatalog(fen) {
+  if (!index) identify(new Chess()); // monta o índice
+  return index.has(posId(fen));
+}

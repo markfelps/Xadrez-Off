@@ -201,3 +201,20 @@ console.log('todos os testes passaram');
   if (!(d > 300 && d <= 4500)) throw new Error('atraso fora do esperado');
   console.log('modo humano ok');
 }
+
+// ---- handicap
+{
+  const { handicapFen, HANDICAPS } = await import('../public/logic.js');
+  const { Chess } = await import('../public/vendor/chess.js');
+  const cnt = (fen, ch) => [...fen.split(' ')[0]].filter((x) => x === ch).length;
+  for (const side of ['w', 'b']) for (const h of HANDICAPS.filter((x) => x.id !== 'none')) {
+    const fen = handicapFen(side, h.id);
+    const c = new Chess(fen); // precisa ser válida
+    const ch = side === 'w' ? h.id.toUpperCase() : h.id;
+    const full = { p: 8, n: 2, b: 2, r: 2, q: 1 }[h.id];
+    assert(cnt(fen, ch) === full - 1, `handicap ${side}${h.id}`);
+    assert(c.moves().length > 0);
+  }
+  assert(!handicapFen('w', 'r').split(' ')[2].includes('Q') && handicapFen('b', 'r').split(' ')[2] === 'KQk');
+  console.log('handicaps ok');
+}

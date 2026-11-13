@@ -7,9 +7,10 @@ import { posKey } from './posid.js';
 import { openPicker } from './openpicker.js';
 import {
   ELO_MIN, ELO_MAX, SF_MAX_ELO, enginePlan, levelName, updateRating, ladderOpponent, meanLevel,
-  HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime,
+  HINT_COST, UNDO_COST, CLOCK_PRESETS, clockConfig, formatClock, engineMovetime, HANDICAPS, handicapFen,
 } from './logic.js';
 import { drawBoard, kingSquare, boardPrefs } from './board.js';
+import { startDrag } from './drag.js';
 import { S, save, orientFlipped, exportBackup, importBackup } from './store.js';
 import { openReview } from './review.js';
 import { openConsult } from './consult.js';
@@ -187,7 +188,6 @@ function render() {
     flipped, sel: selected, legal, marks: hintMarks,
     last: last && [last.from, last.to],
     check: chess.inCheck() ? kingSquare(chess, chess.turn()) : null,
-    onClick: onSquare,
   });
   const hist = chess.history();
   let n = startFen ? +startFen.split(' ')[5] || 1 : 1;
@@ -217,6 +217,26 @@ function tryMove(m) {
   chess.undo();
   render();
 }
+
+// tabuleiro da partida: toque-toque ou arrastar (mouse/dedo)
+$('board').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const s = e.target.closest('.sq');
+  if (!s) return;
+  const sq = s.dataset.sq;
+  if (!active || thinking || chess.turn() !== myColor) return;
+  const p = chess.get(sq);
+  if (p && p.color === myColor) {
+    const was = selected === sq;
+    if (!was) onSquare(sq);                       // seleciona e mostra os lances
+    startDrag(e, p, {
+      boardEl: $('board'), srcSq: sq,
+      onTap: () => { if (was) { selected = null; legal = []; render(); } }, // segundo toque na mesma peça desmarca
+      onDrop: (to) => { if (to && to !== sq) onSquare(to); else render(); },
+      onCancel: render,
+    });
+  } else onSquare(sq);
+});
 
 function renderOpenNote() {
   const el = $('openNote');
@@ -405,8 +425,16 @@ const setStatus = (t) => { $('status').textContent = t; };
 
 function newGame(color, fen = null, oppElo = null, openingSel = null) {
   stopAll();
+  let handicap = null;
   gameId++;
   clockStop();
+  if (!fen && S.hcPiece !== 'none') { // handicap: posição sem uma peça, partida sem rating
+    const me = color === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : color;
+    color = me;
+    fen = handicapFen(S.hcSide === 'me' ? me : opp(me), S.hcPiece);
+    handicap = HANDICAPS.find((h) => h.id === S.hcPiece).label;
+    openingSel = null;
+  }
   const c = fen ? new Chess(fen) : new Chess();
   if (c.isGameOver()) { setStatus('Essa posição já terminou.'); return; }
   if (oppElo) setElo(oppElo);
@@ -431,7 +459,7 @@ function newGame(color, fen = null, oppElo = null, openingSel = null) {
   $('oppName').textContent = `Computador · ${levelName(gameElo)}`;
   renderLevel();
   render();
-  setStatus((fen ? 'Posição personalizada (sem rating). ' : '') + (c.turn() === myColor ? 'Sua vez.' : 'Computador começa.'));
+  setStatus((handicap ? `Handicap: ${S.hcSide === 'me' ? 'você joga' : 'computador joga'} ${handicap} (sem rating). ` : fen ? 'Posição personalizada (sem rating). ' : '') + (c.turn() === myColor ? 'Sua vez.' : 'Computador começa.'));
   renderOpenNote();
   if (c.turn() === myColor) clockStart(myColor);
   engineTurn();
@@ -564,6 +592,10 @@ function drawNewGameUi() {
 document.querySelectorAll('#colorSeg button').forEach((b) => { b.onclick = () => { S.playColor = b.dataset.c; save(); drawNewGameUi(); }; });
 $('openBtn').onclick = () => openPicker({ onPick: (v) => { S.opening = v === 'random' ? 'random' : v ? { eco: v.eco, name: v.name } : null; save(); drawNewGameUi(); } });
 $('openInside').onchange = () => { S.openInside = $('openInside').checked; save(); };
+$('hcPiece').innerHTML = HANDICAPS.map((h) => `<option value="${h.id}">${h.label}</option>`).join('');
+$('hcPiece').value = S.hcPiece; $('hcSide').value = S.hcSide;
+$('hcPiece').onchange = () => { S.hcPiece = $('hcPiece').value; save(); };
+$('hcSide').onchange = () => { S.hcSide = $('hcSide').value; save(); };
 $('startBtn').onclick = () => newGame(S.playColor, null, null, openingFromSel());
 drawNewGameUi();
 $('flip').onclick = () => { flipped = !flipped; render(); };

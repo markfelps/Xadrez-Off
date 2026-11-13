@@ -75,6 +75,8 @@
       <div class="note">Você joga de</div>
       <div id="colorSeg" class="seg"><button data-c="w">♔ Brancas</button><button data-c="b">♚ Pretas</button><button data-c="r">🎲 Aleatório</button></div>
       <button id="openBtn" class="pick"><small>Abertura do computador</small><b id="openName">Livre</b></button>
+      <div class="note">Handicap de material</div>
+      <div class="row2"><select id="hcSide"><option value="pc">Computador joga</option><option value="me">Eu jogo</option></select><select id="hcPiece"></select></div>
       <label class="check"><input id="openInside" type="checkbox"> Já começar dentro da abertura (joga os lances da linha)</label>
       <button id="startBtn" class="accent big">Iniciar partida</button>
     </div>
@@ -106,10 +108,14 @@
   <div id="rvSummary" class="summary"></div>
   <svg id="rvChart" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
   <div class="note">Gráfico: vantagem das brancas (alto) × pretas (baixo). Toque para pular; pontos = seus erros.</div>
-  <div id="rvBoard" class="board"></div>
+  <div class="cs-row">
+    <div id="rvBar" class="evalbar"><div id="rvBarW" class="w"></div></div>
+    <div id="rvBoard" class="board"></div>
+  </div>
   <div id="rvInfo" class="status"></div>
   <div class="buttons"><button id="rvFirst">⏮</button><button id="rvPrev">◀</button><button id="rvNext">▶</button><button id="rvLast">⏭</button></div>
-  <div class="buttons"><button id="rvNextErr">Próximo erro</button><button id="rvPlay">Jogar daqui</button></div>
+  <div class="buttons"><button id="rvNextErr">Próximo erro</button><button id="rvRetry">🔁 Tentar de novo</button><button id="rvShowBest">Ver melhor lance</button></div>
+  <div class="buttons"><button id="rvPlay">Jogar daqui</button></div>
   <div class="buttons"><button id="rvPgn">Copiar PGN</button><button id="rvConsult">Abrir no Consultor</button></div>
 </div></div>
 

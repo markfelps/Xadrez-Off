@@ -12,7 +12,8 @@ const DEFAULTS = {
   openInside: false,         // já começar dentro da abertura
   human: false,              // modo humano: o computador joga como uma pessoa (abaixo de 2850)
   pcBoost: null,             // null = automático (ligado em PC, desligado em celular)
-  confirmMove: false,        // pedir confirmação antes de jogar o lance
+  confirmMove: false,
+  hcSide: 'pc', hcPiece: 'none', // handicap: quem fica sem a peça / qual peça        // pedir confirmação antes de jogar o lance
   consultSide: 'w', csTime: 1500, csPt: false, csBest: true,
 };
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
