@@ -27,10 +27,12 @@
       <span id="clockOpp" class="clock"></span>
     </div>
   </header>
-  <div id="aiBubble" class="aiBubble" hidden></div>
 
   <div id="status" class="status">Escolha o nível e comece.</div>
-  <div id="board" class="board" aria-label="Tabuleiro"></div>
+  <div class="boardWrap">
+    <div id="board" class="board" aria-label="Tabuleiro"></div>
+    <div id="aiBubble" class="aiBubble" hidden></div>
+  </div>
   <div class="buttons under"><button id="undo" disabled>Voltar jogada</button><button id="liveEdit" disabled>Editar posição</button><button id="hint" hidden disabled>Dica</button><button id="reviewBtn" hidden>Revisar partida</button></div>
   <div class="liveLevel"><button data-d="-250">−250</button><button data-d="-100">−100</button><span>Nível <b id="lvlNow">1500</b></span><button data-d="100">+100</button><button data-d="250">+250</button></div>
   <div id="confirmBar" class="buttons under" hidden><button id="cfOk" class="accent">Confirmar lance</button><button id="cfNo">Cancelar</button></div>
@@ -53,11 +55,13 @@
       <div id="aiOpts" hidden>
         <label class="row"><span>Modelo</span><select id="aiModel"></select></label>
         <label class="check"><input id="aiTrash" type="checkbox"> Modo <b>trash talk</b>: o adversário provoca durante a partida</label>
-        <label class="row"><span>Tom das provocações</span><select id="aiPersona">
-          <option value="provocador">Provocador brincalhão</option>
-          <option value="gentil">Gentil/encorajador</option>
-          <option value="grandmestre">Grande mestre arrogante</option>
-          <option value="robo">Robô sarcástico</option>
+        <label class="row"><span>Nível das provocações</span><select id="aiPersona">
+          <option value="gentil">1 · Gentil / encorajador</option>
+          <option value="provocador">2 · Provocador brincalhão</option>
+          <option value="robo">3 · Robô sarcástico</option>
+          <option value="grandmestre">4 · Grande mestre arrogante</option>
+          <option value="acido">5 · Ácido / debochado 🌶️</option>
+          <option value="brutal">6 · Brutal / tóxico 🔥</option>
         </select></label>
         <label class="check"><input id="aiCommentChk" type="checkbox"> Comentar automaticamente os meus lances</label>
         <label class="row"><span>Sua chave do OpenRouter (opcional)</span><input id="aiKey" class="fen" type="password" placeholder="sk-or-... (deixe em branco para usar a do servidor)" autocomplete="off" spellcheck="false"></label>
