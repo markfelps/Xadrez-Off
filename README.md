@@ -15,18 +15,19 @@ O app tem recursos extras que usam um modelo de linguagem via [OpenRouter](https
 - **Análise pós-partida**: um resumo em texto dentro da tela de revisão.
 - **Explicar abertura**: a IA descreve a ideia da abertura jogada.
 
-A chave do OpenRouter **nunca** vai para o navegador: as chamadas passam por uma função
-serverless (`api/chat.js`) que guarda a chave numa variável de ambiente. Por isso esses
-recursos precisam de um servidor (não funcionam no GitHub Pages, que é só estático).
+A chave do OpenRouter **nunca** vai para o navegador: as chamadas passam pela rota
+`POST /api/chat` do `server.cjs`, que guarda a chave numa variável de ambiente. Por isso
+esses recursos precisam de um servidor (não funcionam no GitHub Pages, que é só estático).
 
 ### Publicar na Vercel (recomendado para a IA)
 
 1. Crie uma conta em [vercel.com](https://vercel.com) e importe este repositório.
-2. A Vercel detecta sozinha: serve a pasta `public/` como site e `api/chat.js` como função.
-   Os cabeçalhos COOP/COEP (necessários para o Stockfish) já estão em `vercel.json`.
+2. A Vercel usa o `server.cjs` como entrypoint: ele serve a pasta `public/` como site
+   (com os cabeçalhos COOP/COEP do Stockfish) e responde a rota `/api/chat`.
 3. Em **Settings → Environment Variables**, adicione:
    - `OPENROUTER_API_KEY` = sua chave do OpenRouter (começa com `sk-or-...`).
-4. Faça o deploy. Pronto: abra a URL da Vercel no celular ou no PC.
+4. Faça o deploy. Teste em `https://SEU-APP.vercel.app/api/chat` (deve mostrar um JSON
+   `{"error":"Método não permitido."}` — a rota só aceita POST). Pronto.
 
 No deploy da Vercel o motor completo de 95 MB é omitido automaticamente (só o motor leve vai);
 o app esconde essa opção sozinho. O APK e o `npm start` local continuam com o motor completo.

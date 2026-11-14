@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Xadrez offline contra Stockfish com rating Elo",
   "scripts": {
-    "start": "node dev-server.cjs",
+    "start": "node server.cjs",
     "test": "node tests/test.mjs",
     "www": "node build-www.cjs",
     "apk:sync": "node build-www.cjs && npx cap sync android",
