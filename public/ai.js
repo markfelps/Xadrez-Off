@@ -7,12 +7,14 @@ import { S } from './store.js';
 const ENDPOINT = '/api/chat';
 export const MODELS = [
   ['openai/gpt-4o-mini', 'GPT-4o mini (rápido e barato)'],
+  ['x-ai/grok-3-mini', 'Grok 3 Mini (barato e solto — ideal p/ trash talk)'],
+  ['x-ai/grok-4', 'Grok 4 (mais afiado no trash talk, mais caro)'],
   ['anthropic/claude-3.5-haiku', 'Claude 3.5 Haiku'],
   ['google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'],
   ['deepseek/deepseek-chat', 'DeepSeek Chat'],
   ['meta-llama/llama-3.3-70b-instruct', 'Llama 3.3 70B'],
-  ['openai/gpt-4o', 'GPT-4o (melhor, mais caro)'],
-  ['anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet (melhor, mais caro)'],
+  ['openai/gpt-4o', 'GPT-4o (melhor p/ coach, mais caro)'],
+  ['anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet (melhor p/ coach, mais caro)'],
 ];
 
 export const aiOn = () => !!(S.ai && S.ai.on);
