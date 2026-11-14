@@ -7,22 +7,37 @@ import { S } from './store.js';
 const ENDPOINT = '/api/chat';
 export const MODELS = [
   ['openai/gpt-4o-mini', 'GPT-4o mini (rápido e barato)'],
+  ['x-ai/grok-3-mini', 'Grok 3 Mini (barato e solto — ideal p/ trash talk)'],
+  ['x-ai/grok-4', 'Grok 4 (mais afiado no trash talk, mais caro)'],
   ['anthropic/claude-3.5-haiku', 'Claude 3.5 Haiku'],
   ['google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'],
   ['deepseek/deepseek-chat', 'DeepSeek Chat'],
   ['meta-llama/llama-3.3-70b-instruct', 'Llama 3.3 70B'],
-  ['openai/gpt-4o', 'GPT-4o (melhor, mais caro)'],
-  ['anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet (melhor, mais caro)'],
+  ['openai/gpt-4o', 'GPT-4o (melhor p/ coach, mais caro)'],
+  ['anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet (melhor p/ coach, mais caro)'],
 ];
 
 export const aiOn = () => !!(S.ai && S.ai.on);
 
+// personas em ordem de intensidade (do mais leve ao mais pesado)
 export const PERSONAS = {
-  provocador: 'um enxadrista brincalhão e provocador, que solta tiradas espertas mas de bom humor (nunca ofensivo, sem palavrões, sem nada pesado)',
   gentil: 'um treinador simpático e encorajador, que provoca de leve mas sempre com carinho',
-  grandmestre: 'um grande mestre arrogante e teatral, cheio de pose, que acha graça dos seus lances',
+  provocador: 'um enxadrista brincalhão e provocador, que solta tiradas espertas de bom humor',
   robo: 'um robô frio e sarcástico que fala de forma curta e mecânica, zoando com lógica implacável',
+  grandmestre: 'um grande mestre arrogante e teatral, cheio de pose, que acha graça dos seus lances',
+  acido: 'um zoeiro ácido e debochado, que alfineta sem dó no estilo de lobby de videogame',
+  brutal: 'um adversário brutal e tóxico de lobby de videogame, que humilha o seu jogo com deboche cruel e ironia pesada',
 };
+// quão longe cada persona pode ir (o restante é travado pelos limites rígidos)
+const PERSONA_RULE = {
+  gentil: 'Tom leve e carinhoso, sem ofensas.',
+  provocador: 'Provoque com humor, sem xingamentos.',
+  robo: 'Seja frio e sarcástico, sem xingamentos.',
+  grandmestre: 'Seja arrogante e teatral, sem xingamentos.',
+  acido: 'Pode ser ácido e debochado, com alfinetadas pesadas sobre o jogo; palavrões levíssimos (ex.: "que lance ridículo", "jogada patética") são permitidos.',
+  brutal: 'Modo tóxico de lobby: deboche cruel e humilhante sobre o jogo da pessoa, com ironia pesada e palavrões leves. Capriche na zoeira.',
+};
+const HARD_LIMITS = 'LIMITES RÍGIDOS, nunca quebre: proibido discurso de ódio ou xingamentos de cunho racista, sexista, homofóbico, religioso, ou sobre aparência, peso, deficiência ou família; nada sexual; nada de ameaças reais de violência nem de incentivo a autolesão. O alvo é SEMPRE o xadrez e os lances da pessoa — é só zoeira de jogo.';
 
 // chamada base ao proxy
 export async function chat(messages, { temperature = 0.8, max_tokens = 400, signal } = {}) {
@@ -55,10 +70,12 @@ function edgeText(cpForSide) {
 // ---------- trash talk ----------
 // ctx: { level, lastSan, playerColor, cpForEngine (cp do ponto de vista do computador), movesSan }
 export async function trashTalk(ctx, opts = {}) {
-  const persona = PERSONAS[(S.ai && S.ai.persona)] || PERSONAS.provocador;
+  const pid = (S.ai && S.ai.persona) || 'provocador';
+  const persona = PERSONAS[pid] || PERSONAS.provocador;
+  const rule = PERSONA_RULE[pid] || PERSONA_RULE.provocador;
   const sys = `Você é o adversário de xadrez de um app, jogando contra o usuário. Personagem: ${persona}. `
-    + `Responda em português do Brasil, com UMA frase curta (no máximo ~15 palavras), em primeira pessoa, como se fosse você jogando contra a pessoa. `
-    + `É só diversão: provoque sobre a partida, nunca seja realmente ofensivo nem use xingamentos.`;
+    + `${rule} ${HARD_LIMITS} `
+    + `Responda em português do Brasil, com UMA frase curta (no máximo ~18 palavras), em primeira pessoa, como se fosse você jogando contra a pessoa.`;
   const edge = edgeText(ctx.cpForEngine);
   const user = `Nível do computador: ${ctx.level}. Situação atual (sua, o computador): ${edge}. `
     + (ctx.lastSan ? `Último lance jogado no tabuleiro: ${ctx.lastSan}. ` : '')
