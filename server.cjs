@@ -19,11 +19,8 @@ const TYPES = {
 // ---------- proxy do OpenRouter ----------
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
-const ALLOWED_MODELS = [
-  'openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-3.5-haiku', 'anthropic/claude-3.5-sonnet',
-  'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct', 'deepseek/deepseek-chat',
-  'x-ai/grok-3-mini', 'x-ai/grok-4',
-];
+// Sem lista branca de modelos: o usuário escolhe qualquer ID válido do OpenRouter
+// (os IDs mudam com o tempo). O custo fica limitado pelo teto de max_tokens abaixo.
 
 function sendJson(res, code, obj) {
   const b = JSON.stringify(obj);
@@ -44,7 +41,7 @@ function handleChat(req, res) {
     if (!key) { sendJson(res, 500, { error: 'A IA não está configurada. Defina OPENROUTER_API_KEY no servidor (Vercel) ou cole sua própria chave do OpenRouter nas configurações.' }); return; }
     const { messages, model, temperature, max_tokens } = body;
     if (!Array.isArray(messages) || !messages.length) { sendJson(res, 400, { error: 'Faltou "messages".' }); return; }
-    const chosen = ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL;
+    const chosen = (typeof model === 'string' && model.trim()) ? model.trim() : DEFAULT_MODEL;
     try {
       if (typeof fetch !== 'function') throw new Error('Node sem fetch global (use Node 18+).');
       const r = await fetch(OPENROUTER_URL, {

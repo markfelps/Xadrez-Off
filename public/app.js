@@ -773,7 +773,9 @@ async function coachExplain() {
 function buildAiUi() {
   const sel = $('aiModel');
   sel.innerHTML = ai.MODELS.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
-  sel.value = S.ai.model;
+  // migra IDs descontinuados conhecidos
+  if (ai.DEAD_MODELS[S.ai.model]) { S.ai.model = ai.DEAD_MODELS[S.ai.model]; save(); }
+  syncModelUi();
   $('aiOn').checked = S.ai.on;
   $('aiTrash').checked = S.ai.trash;
   $('aiPersona').value = S.ai.persona;
@@ -787,7 +789,25 @@ function refreshAi() {
   if (!S.ai.on) { $('aiBubble').hidden = true; $('aiComment').hidden = true; }
 }
 $('aiOn').onchange = () => { S.ai.on = $('aiOn').checked; save(); refreshAi(); };
-$('aiModel').onchange = () => { S.ai.model = $('aiModel').value; save(); };
+// mostra o <select> no item certo e revela o campo "Outro" quando o modelo é personalizado
+function syncModelUi() {
+  const fixed = ai.MODELS.map((m) => m[0]).filter((v) => v !== ai.CUSTOM);
+  const isCustom = !fixed.includes(S.ai.model);
+  $('aiModel').value = isCustom ? ai.CUSTOM : S.ai.model;
+  $('aiModelCustom').hidden = !isCustom;
+  $('aiModelNote').hidden = !isCustom;
+  if (isCustom) $('aiModelCustom').value = S.ai.model;
+}
+$('aiModel').onchange = () => {
+  const v = $('aiModel').value;
+  if (v === ai.CUSTOM) {
+    S.ai.model = $('aiModelCustom').value.trim();
+    $('aiModelCustom').hidden = false; $('aiModelNote').hidden = false;
+    $('aiModelCustom').focus();
+  } else { S.ai.model = v; $('aiModelCustom').hidden = true; $('aiModelNote').hidden = true; }
+  save();
+};
+$('aiModelCustom').onchange = () => { S.ai.model = $('aiModelCustom').value.trim(); save(); };
 $('aiTrash').onchange = () => { S.ai.trash = $('aiTrash').checked; save(); };
 $('aiPersona').onchange = () => { S.ai.persona = $('aiPersona').value; save(); };
 $('aiCommentChk').onchange = () => { S.ai.comment = $('aiCommentChk').checked; save(); if (!S.ai.comment) $('aiComment').hidden = true; };
