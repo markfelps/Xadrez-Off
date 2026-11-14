@@ -15,6 +15,15 @@ const DEFAULTS = {
   confirmMove: false,
   hcSide: 'pc', hcPiece: 'none', // handicap: quem fica sem a peça / qual peça        // pedir confirmação antes de jogar o lance
   consultSide: 'w', csTime: 1500, csPt: false, csBest: true,
+  // IA (OpenRouter, via proxy /api/chat). Tudo desligado por padrão.
+  ai: {
+    on: false,            // liga/desliga todos os recursos de IA
+    key: '',              // chave própria do OpenRouter (opcional; se vazio usa a do servidor)
+    model: 'openai/gpt-4o-mini',
+    trash: false,         // modo trash talk: o adversário provoca
+    comment: false,       // comentar seus lances automaticamente
+    persona: 'provocador', // tom do adversário no trash talk
+  },
 };
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 
@@ -24,6 +33,7 @@ function build(base) {
     elo: base.elo || 1500,
     player: { ...newPlayer(), ...(base.player || {}) },
     clock: { ...CLOCK_DEFAULT, ...(base.clock || {}) },
+    ai: { ...DEFAULTS.ai, ...(base.ai || {}) },
     games: base.games || [], puzzles: base.puzzles || [],
   };
 }

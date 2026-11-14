@@ -17,6 +17,7 @@ import { openConsult } from './consult.js';
 import { downloadText } from './util.js';
 import { openPuzzles, puzzleCount } from './puzzles.js';
 import { openEditor } from './editor.js';
+import * as ai from './ai.js';
 
 const $ = (id) => document.getElementById(id);
 const parse = (u) => ({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
@@ -281,10 +282,13 @@ function askPromotion(from, to) {
 function playMove(m) {
   clearPending();
   selected = null; legal = []; hintMarks = {}; hintMv = null;
-  try { chess.move(m); } catch { return render(); }
+  const prevFen = chess.fen();
+  let mv;
+  try { mv = chess.move(m); } catch { return render(); }
   clockStop();
   if (clock.on) clock[myColor] += clock.incMs;
   render();
+  if (ai.aiOn() && S.ai.comment && mv) commentUserMove(prevFen, chess.fen(), mv.san);
   if (!checkEnd()) engineTurn();
 }
 
@@ -372,6 +376,8 @@ async function engineTurn() {
   if (!checkEnd()) {
     clockStart(myColor);
     setStatus((chess.inCheck() ? 'Xeque! Sua vez.' : 'Sua vez.') + (book ? (book.chosen ? ' (abertura escolhida)' : ` (teoria${book.name ? ': ' + book.name : ''})`) : ''));
+    if (ai.aiOn() && S.ai.trash && chess.history().length >= 2 && Math.random() < 0.33)
+      maybeTrash(chess.history().slice(-1)[0], engColor, moveElo);
     // ponder: continua pensando, na posição prevista, enquanto você joga
     if (boost() && eng && !book && !plan.limit && !(S.human && moveElo < HUMAN_MAX)) eng.startPonder(plan, uciHistory(), startFen, eng.lastPonder);
   }
@@ -418,6 +424,7 @@ function finish(score, msg) {
   $('reviewBtn').hidden = false;
   renderLevel();
   updateControls();
+  if (ai.aiOn() && S.ai.trash) endTrash(score);
   if (rated && $('ladder').checked) setElo(ladderOpponent(player.rating));
 }
 
@@ -455,6 +462,7 @@ function newGame(color, fen = null, oppElo = null, openingSel = null) {
   if (cfg) { clock.minMs = cfg.minMs; clock.engMs = cfg.engMs; clock.incMs = cfg.incMs; clock[myColor] = cfg.minMs; clock[opp(myColor)] = cfg.engMs; }
   $('resign').disabled = false;
   $('reviewBtn').hidden = true;
+  $('aiBubble').hidden = true; $('aiComment').hidden = true;
   $('lastDelta').textContent = '';
   $('oppName').textContent = `Computador · ${levelName(gameElo)}`;
   renderLevel();
@@ -637,6 +645,160 @@ $('bkFile').onchange = async () => {
 };
 $('posBtn').onclick = () => openEditor({ onPlay: (fen, color) => newGame(color, fen) });
 
+// ---------- IA (OpenRouter) ----------
+// vantagem de material (síncrona, sem usar o motor — que é um worker único compartilhado
+// com a partida). cp aproximado do ponto de vista de `forColor`. Serve de contexto para a IA;
+// a análise precisa do motor fica só na revisão pós-partida.
+const PIECE_VAL = { p: 100, n: 300, b: 300, r: 500, q: 900 };
+function materialCp(fen, forColor) {
+  let w = 0, b = 0;
+  for (const ch of fen.split(' ')[0]) {
+    const v = PIECE_VAL[ch.toLowerCase()];
+    if (!v) continue;
+    if (ch === ch.toUpperCase()) w += v; else b += v;
+  }
+  const diffW = w - b;
+  return forColor === 'w' ? diffW : -diffW;
+}
+
+let bubbleTimer = null;
+function showBubble(text, { loading = false } = {}) {
+  const el = $('aiBubble');
+  el.hidden = false;
+  el.textContent = text;
+  el.classList.toggle('loading', loading);
+  clearTimeout(bubbleTimer);
+  if (!loading) bubbleTimer = setTimeout(() => { el.hidden = true; }, 9000);
+}
+
+let trashBusy = false;
+async function maybeTrash(lastSan, engColor, level) {
+  if (trashBusy) return;
+  trashBusy = true;
+  try {
+    const cp = materialCp(chess.fen(), engColor);
+    const line = await ai.trashTalk({ level, lastSan, cpForEngine: cp });
+    if (line) showBubble(line);
+  } catch (e) { /* silencioso: trash talk nunca atrapalha a partida */ }
+  finally { trashBusy = false; }
+}
+
+async function endTrash(score) {
+  try {
+    // score é do usuário: 1 vitória, 0.5 empate, 0 derrota → para o computador é o oposto
+    const cpForEngine = score === 1 ? -800 : score === 0 ? 800 : 0;
+    const line = await ai.trashTalk({ level: gameElo, lastSan: score === 1 ? 'o usuário te venceu' : score === 0 ? 'você venceu o usuário' : 'empate', cpForEngine });
+    if (line) showBubble(line);
+  } catch {}
+}
+
+async function commentUserMove(prevFen, newFen, san) {
+  const box = $('aiComment');
+  box.hidden = false; box.classList.add('loading'); box.textContent = 'Comentando seu lance…';
+  try {
+    const before = materialCp(prevFen, myColor), after = materialCp(newFen, myColor);
+    const txt = await ai.commentMove({ san, byUser: true, cpBeforeForUser: before, cpAfterForUser: after });
+    box.classList.remove('loading');
+    if (txt) box.textContent = '🤖 ' + txt; else box.hidden = true;
+  } catch (e) { box.classList.remove('loading'); box.innerHTML = `<span class="err">IA: ${e.message}</span>`; }
+}
+
+// ---------- coach (overlay) ----------
+let coachHist = [];
+function openCoach() {
+  $('coach').hidden = false;
+  $('coachMsg').textContent = '';
+  renderCoach();
+  $('coachInput').focus();
+}
+function renderCoach() {
+  const log = $('coachLog');
+  log.innerHTML = '';
+  if (!coachHist.length) {
+    const d = document.createElement('div');
+    d.className = 'msg ai';
+    d.textContent = active ? 'Pergunte o que quiser sobre a posição atual.' : 'Inicie uma partida e eu ajudo com a posição. Você também pode pedir para explicar a abertura.';
+    log.appendChild(d);
+  }
+  for (const m of coachHist) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + (m.role === 'user' ? 'me' : 'ai');
+    d.textContent = m.content;
+    log.appendChild(d);
+  }
+  log.scrollTop = 1e6;
+}
+function coachCtx() {
+  return {
+    fen: chess.fen(),
+    movesSan: chess.history().join(' '),
+    turn: chess.turn(),
+    level: active ? gameElo : elo,
+  };
+}
+async function coachSend() {
+  const q = $('coachInput').value.trim();
+  if (!q) return;
+  $('coachInput').value = '';
+  coachHist.push({ role: 'user', content: q });
+  renderCoach();
+  const log = $('coachLog');
+  const d = document.createElement('div'); d.className = 'msg ai loading'; d.textContent = 'Pensando…';
+  log.appendChild(d); log.scrollTop = 1e6;
+  try {
+    const ctx = coachCtx();
+    ctx.cpForUser = active ? materialCp(chess.fen(), myColor) : null;
+    const ans = await ai.coach(q, ctx, coachHist.slice(0, -1));
+    coachHist.push({ role: 'assistant', content: ans || '(sem resposta)' });
+    renderCoach();
+  } catch (e) { d.classList.remove('loading'); d.innerHTML = `<span class="err">IA: ${e.message}</span>`; }
+}
+async function coachExplain() {
+  const op = (!startFen && chess.history().length) ? identify(chess) : null;
+  const name = op ? op.name : (openChosen ? openChosen.name : null);
+  if (!name) { $('coachMsg').textContent = 'Nenhuma abertura reconhecida ainda — jogue alguns lances.'; return; }
+  coachHist.push({ role: 'user', content: `Explique a abertura: ${name}` });
+  renderCoach();
+  const log = $('coachLog');
+  const d = document.createElement('div'); d.className = 'msg ai loading'; d.textContent = 'Pensando…';
+  log.appendChild(d); log.scrollTop = 1e6;
+  try {
+    const ans = await ai.explainOpening(name, op ? op.eco : '', chess.history().join(' '));
+    coachHist.push({ role: 'assistant', content: ans || '(sem resposta)' });
+    renderCoach();
+  } catch (e) { d.classList.remove('loading'); d.innerHTML = `<span class="err">IA: ${e.message}</span>`; }
+}
+
+// ---------- configurações de IA ----------
+function buildAiUi() {
+  const sel = $('aiModel');
+  sel.innerHTML = ai.MODELS.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+  sel.value = S.ai.model;
+  $('aiOn').checked = S.ai.on;
+  $('aiTrash').checked = S.ai.trash;
+  $('aiPersona').value = S.ai.persona;
+  $('aiCommentChk').checked = S.ai.comment;
+  $('aiKey').value = S.ai.key;
+  refreshAi();
+}
+function refreshAi() {
+  $('aiOpts').hidden = !S.ai.on;
+  $('coachBtn').hidden = !S.ai.on;
+  if (!S.ai.on) { $('aiBubble').hidden = true; $('aiComment').hidden = true; }
+}
+$('aiOn').onchange = () => { S.ai.on = $('aiOn').checked; save(); refreshAi(); };
+$('aiModel').onchange = () => { S.ai.model = $('aiModel').value; save(); };
+$('aiTrash').onchange = () => { S.ai.trash = $('aiTrash').checked; save(); };
+$('aiPersona').onchange = () => { S.ai.persona = $('aiPersona').value; save(); };
+$('aiCommentChk').onchange = () => { S.ai.comment = $('aiCommentChk').checked; save(); if (!S.ai.comment) $('aiComment').hidden = true; };
+$('aiKey').onchange = () => { S.ai.key = $('aiKey').value.trim(); save(); };
+$('coachBtn').onclick = openCoach;
+$('coachClose').onclick = () => { $('coach').hidden = true; };
+$('coachSend').onclick = coachSend;
+$('coachInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') coachSend(); });
+$('coachExplain').onclick = coachExplain;
+$('coachClear').onclick = () => { coachHist = []; renderCoach(); };
+
 // ---------- init ----------
 $('fullEngine').checked = (() => { try { return localStorage.getItem('xo-full') === '1'; } catch { return false; } })() || !matchMedia('(pointer: coarse)').matches;
 fetch('engine/stockfish-19-single.wasm', { method: 'HEAD' }).then((r) => { if (!r.ok) throw 0; }).catch(() => { $('fullEngine').checked = false; $('fullEngine').closest('label').hidden = true; });
@@ -644,6 +806,7 @@ $('fullEngine').onchange = () => { saveFull(); warm(); };
 flipped = orientFlipped('w');
 buildClockUi();
 buildPresets();
+buildAiUi();
 setElo(elo);
 render();
 getEngine('lite').ready.catch(() => {}); // aquece o motor leve já na abertura

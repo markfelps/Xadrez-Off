@@ -27,6 +27,7 @@
       <span id="clockOpp" class="clock"></span>
     </div>
   </header>
+  <div id="aiBubble" class="aiBubble" hidden></div>
 
   <div id="status" class="status">Escolha o nível e comece.</div>
   <div id="board" class="board" aria-label="Tabuleiro"></div>
@@ -35,6 +36,7 @@
   <div id="confirmBar" class="buttons under" hidden><button id="cfOk" class="accent">Confirmar lance</button><button id="cfNo">Cancelar</button></div>
   <div id="moves" class="moves"></div>
   <div id="openNote" class="openNote"></div>
+  <div id="aiComment" class="aiComment" hidden></div>
 
   <section class="panel">
     <label class="row">
@@ -44,6 +46,25 @@
     <div id="presets" class="presets"></div>
     <p id="eloNote" class="note"></p>
     <p id="engStatus" class="note"></p>
+
+    <details class="ai-box">
+      <summary>🤖 IA (OpenRouter) — recursos extras</summary>
+      <label class="check"><input id="aiOn" type="checkbox"> Ligar os recursos de IA (coach, comentários, trash talk, análise)</label>
+      <div id="aiOpts" hidden>
+        <label class="row"><span>Modelo</span><select id="aiModel"></select></label>
+        <label class="check"><input id="aiTrash" type="checkbox"> Modo <b>trash talk</b>: o adversário provoca durante a partida</label>
+        <label class="row"><span>Tom das provocações</span><select id="aiPersona">
+          <option value="provocador">Provocador brincalhão</option>
+          <option value="gentil">Gentil/encorajador</option>
+          <option value="grandmestre">Grande mestre arrogante</option>
+          <option value="robo">Robô sarcástico</option>
+        </select></label>
+        <label class="check"><input id="aiCommentChk" type="checkbox"> Comentar automaticamente os meus lances</label>
+        <label class="row"><span>Sua chave do OpenRouter (opcional)</span><input id="aiKey" class="fen" type="password" placeholder="sk-or-... (deixe em branco para usar a do servidor)" autocomplete="off" spellcheck="false"></label>
+        <p class="note">Sem chave aqui, usa-se a chave configurada no servidor (OPENROUTER_API_KEY). Sua chave fica só neste aparelho. Os recursos de IA precisam de internet.</p>
+        <p id="aiStatus" class="note"></p>
+      </div>
+    </details>
 
     <label class="row">
       <span>Orientação do tabuleiro</span>
@@ -82,6 +103,7 @@
     </div>
     <div class="buttons">
       <button id="consBtn" class="accent">Consultor (Chess.com)</button>
+      <button id="coachBtn" hidden>🤖 Coach IA</button>
     </div>
     <div class="buttons">
       <button id="posBtn">Posição específica…</button>
@@ -106,6 +128,8 @@
   <div class="ov-head"><b>Revisão da partida</b><button id="rvClose" class="x">✕</button></div>
   <div id="rvProg" class="note"></div>
   <div id="rvSummary" class="summary"></div>
+  <div class="buttons" id="rvAiRow" hidden><button id="rvAiSummary">🤖 Resumo da IA</button></div>
+  <div id="rvAiText" class="aiComment" hidden></div>
   <svg id="rvChart" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
   <div class="note">Gráfico: vantagem das brancas (alto) × pretas (baixo). Toque para pular; pontos = seus erros.</div>
   <div class="cs-row">
@@ -173,6 +197,15 @@
   <textarea id="csText" rows="3" placeholder="Cole aqui o PGN ou FEN copiado do Chess.com"></textarea>
   <div class="buttons"><button id="csLoad">Carregar PGN/FEN</button><button id="csReset">Posição inicial</button></div>
   <div class="buttons"><button id="csCopyPgn">Copiar PGN</button><button id="csCopyFen">Copiar FEN</button></div>
+</div></div>
+
+<div id="coach" class="overlay" hidden><div class="inner">
+  <div class="ov-head"><b>🤖 Coach IA</b><button id="coachClose" class="x">✕</button></div>
+  <div class="note">Pergunte sobre a posição atual da partida: planos, o que fazer, por que um lance é bom. A IA vê a posição no tabuleiro.</div>
+  <div id="coachLog" class="coachLog"></div>
+  <div class="inputrow"><input id="coachInput" placeholder="Ex.: qual o meu melhor plano aqui?" autocomplete="off"><button id="coachSend">Enviar</button></div>
+  <div class="buttons"><button id="coachExplain">Explicar a abertura</button><button id="coachClear" class="ghost">Limpar</button></div>
+  <div id="coachMsg" class="note"></div>
 </div></div>
 
 <div id="promo" class="promo" hidden></div>

@@ -1,10 +1,11 @@
 import { Chess } from './vendor/chess.js';
 import { getEngine } from './engine.js';
 import { summarizeGame, pickPuzzles, winPct, classifyMove, materialBalance, phaseOf, MOVE_CLASSES, MOVE_LABEL, MOVE_SYMBOL, BAD_CLASSES, PHASE_LABEL } from './logic.js';
-import { inCatalog } from './openings.js';
+import { inCatalog, identify } from './openings.js';
 import { drawBoard, drawArrow } from './board.js';
 import { S, save, orientFlipped } from './store.js';
 import { copyText } from './util.js';
+import * as ai from './ai.js';
 
 const $ = (id) => document.getElementById(id);
 const parse = (u) => ({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
@@ -113,6 +114,28 @@ export async function openReview(game, { onPlay, onPuzzles, onConsult }) {
     `<div class="phases">${['opening', 'middlegame', 'endgame'].map((p) => `${PHASE_LABEL[p]} <b>${f(sum.phases[p])}</b>`).join(' · ')}</div>` +
     `<div class="cls-table"><span class="h"></span><span class="h n">Você</span><span class="h n">Comp.</span>${rows}</div>` +
     (added ? `<div class="good">+${added} puzzle(s) criado(s) a partir desta derrota</div>` : '');
+
+  // ---- resumo da IA (opcional) ----
+  const aiRow = $('rvAiRow'), aiText = $('rvAiText');
+  aiText.hidden = true; aiText.textContent = '';
+  aiRow.hidden = !ai.aiOn();
+  if (ai.aiOn()) {
+    $('rvAiSummary').onclick = async () => {
+      aiText.hidden = false; aiText.classList.add('loading'); aiText.textContent = 'Gerando resumo…';
+      try {
+        let openingName = null;
+        try {
+          const c = new Chess();
+          for (let i = 0; i < Math.min(game.moves.length, 20); i++) c.move(parse(game.moves[i]));
+          const o = identify(c); openingName = o ? o.name : null;
+        } catch {}
+        const result = game.score === 1 ? 'vitória' : game.score === 0 ? 'derrota' : 'empate';
+        const txt = await ai.gameSummary(sum, { color: game.color, result, oppElo: game.oppElo, openingName });
+        aiText.classList.remove('loading');
+        aiText.textContent = '🤖 ' + (txt || '(sem resposta)');
+      } catch (e) { aiText.classList.remove('loading'); aiText.innerHTML = `<span class="err">IA: ${e.message}</span>`; }
+    };
+  }
 
   const n = game.moves.length;
   const flipped = orientFlipped(game.color);
