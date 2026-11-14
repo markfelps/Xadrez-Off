@@ -5,16 +5,23 @@
 import { S } from './store.js';
 
 const ENDPOINT = '/api/chat';
+// IDs de modelo mudam com o tempo no OpenRouter; aqui ficam só os confirmados.
+// Para qualquer outro, use a opção "Outro" e cole o ID atual de openrouter.ai/models.
+export const CUSTOM = '__custom__';
 export const MODELS = [
   ['openai/gpt-4o-mini', 'GPT-4o mini (rápido e barato)'],
   ['x-ai/grok-4.3', 'Grok 4.3 (afiado e solto — ótimo p/ trash talk)'],
-  ['anthropic/claude-3.5-haiku', 'Claude 3.5 Haiku'],
-  ['google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'],
-  ['deepseek/deepseek-chat', 'DeepSeek Chat'],
-  ['meta-llama/llama-3.3-70b-instruct', 'Llama 3.3 70B'],
   ['openai/gpt-4o', 'GPT-4o (melhor p/ coach, mais caro)'],
-  ['anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet (melhor p/ coach, mais caro)'],
+  [CUSTOM, '✏️ Outro — digitar o ID do OpenRouter'],
 ];
+// migração de IDs descontinuados que já conhecemos
+export const DEAD_MODELS = {
+  'x-ai/grok-3-mini': 'x-ai/grok-4.3',
+  'google/gemini-2.0-flash-001': 'openai/gpt-4o-mini',
+  'anthropic/claude-3.5-haiku': 'openai/gpt-4o-mini',
+  'anthropic/claude-3.5-sonnet': 'openai/gpt-4o',
+  'meta-llama/llama-3.3-70b-instruct': 'openai/gpt-4o-mini',
+};
 
 export const aiOn = () => !!(S.ai && S.ai.on);
 

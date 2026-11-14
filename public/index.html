@@ -54,6 +54,8 @@
       <label class="check"><input id="aiOn" type="checkbox"> Ligar os recursos de IA (coach, comentários, trash talk, análise)</label>
       <div id="aiOpts" hidden>
         <label class="row"><span>Modelo</span><select id="aiModel"></select></label>
+        <input id="aiModelCustom" class="fen" type="text" placeholder="ID do modelo, ex.: x-ai/grok-4.3 ou google/gemini-3-flash" autocomplete="off" spellcheck="false" hidden>
+        <p id="aiModelNote" class="note" hidden>Cole o ID exato de <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>.</p>
         <label class="check"><input id="aiTrash" type="checkbox"> Modo <b>trash talk</b>: o adversário provoca durante a partida</label>
         <label class="row"><span>Nível das provocações</span><select id="aiPersona">
           <option value="gentil">1 · Gentil / encorajador</option>
