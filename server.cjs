@@ -22,7 +22,7 @@ const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 const ALLOWED_MODELS = [
   'openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-3.5-haiku', 'anthropic/claude-3.5-sonnet',
   'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct', 'deepseek/deepseek-chat',
-  'x-ai/grok-3-mini', 'x-ai/grok-4',
+  'x-ai/grok-4.3', 'x-ai/grok-4',
 ];
 
 function sendJson(res, code, obj) {

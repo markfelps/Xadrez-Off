@@ -7,8 +7,7 @@ import { S } from './store.js';
 const ENDPOINT = '/api/chat';
 export const MODELS = [
   ['openai/gpt-4o-mini', 'GPT-4o mini (rápido e barato)'],
-  ['x-ai/grok-3-mini', 'Grok 3 Mini (barato e solto — ideal p/ trash talk)'],
-  ['x-ai/grok-4', 'Grok 4 (mais afiado no trash talk, mais caro)'],
+  ['x-ai/grok-4.3', 'Grok 4.3 (afiado e solto — ótimo p/ trash talk)'],
   ['anthropic/claude-3.5-haiku', 'Claude 3.5 Haiku'],
   ['google/gemini-2.0-flash-001', 'Gemini 2.0 Flash'],
   ['deepseek/deepseek-chat', 'DeepSeek Chat'],

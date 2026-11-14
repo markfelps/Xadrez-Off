@@ -773,6 +773,11 @@ async function coachExplain() {
 function buildAiUi() {
   const sel = $('aiModel');
   sel.innerHTML = ai.MODELS.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+  // migra modelos antigos/descontinuados para um valido
+  const valid = ai.MODELS.map((m) => m[0]);
+  if (S.ai.model === 'x-ai/grok-3-mini') S.ai.model = 'x-ai/grok-4.3';
+  if (!valid.includes(S.ai.model)) S.ai.model = ai.MODELS[0][0];
+  save();
   sel.value = S.ai.model;
   $('aiOn').checked = S.ai.on;
   $('aiTrash').checked = S.ai.trash;
